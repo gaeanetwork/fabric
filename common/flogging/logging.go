@@ -196,7 +196,7 @@ func (s *Logging) ZapLogger(name string) *zap.Logger {
 	// always return true here because the core's Check()
 	// method computes the level for the logger name based
 	// on the active logging spec
-	levelEnabler := zap.LevelEnablerFunc(func(l zapcore.Level) bool { return true })
+	levelEnabler := zap.LevelEnablerFunc(func(l zapcore.Level) bool { return l >= s.defaultLevel })
 
 	s.mutex.RLock()
 	core := &Core{

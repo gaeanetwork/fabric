@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -141,6 +142,11 @@ func (c *coordinator) StorePvtData(txID string, privData *transientstore2.TxPvtR
 	return c.TransientStore.PersistWithConfig(txID, blkHeight, privData)
 }
 
+var (
+	retryThresh         time.Duration
+	retryThreshInitOnce sync.Once
+)
+
 // StoreBlock stores block with private data into the ledger
 func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDataCollections) error {
 	if block.Data == nil {
@@ -177,7 +183,7 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 		return err
 	}
 
-	retryThresh := viper.GetDuration("peer.gossip.pvtData.pullRetryThreshold")
+	retryThreshInitOnce.Do(func() { retryThresh = viper.GetDuration("peer.gossip.pvtData.pullRetryThreshold") })
 	var bFetchFromPeers bool // defaults to false
 	if len(privateInfo.missingKeys) == 0 {
 		logger.Debugf("[%s] No missing collection private write sets to fetch from remote peers", c.ChainID)

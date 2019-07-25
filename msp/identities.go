@@ -9,9 +9,11 @@ package msp
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -138,11 +140,23 @@ func NewSerializedIdentity(mspID string, certPEM []byte) ([]byte, error) {
 	return raw, nil
 }
 
+var (
+	cachedVerifiedMap = make(map[[32]byte]struct{})
+	rwMutex           sync.RWMutex
+)
+
 // Verify checks against a signature and a message
 // to determine whether this identity produced the
 // signature; it returns nil if so or an error otherwise
 func (id *identity) Verify(msg []byte, sig []byte) error {
 	// mspIdentityLogger.Infof("Verifying signature")
+	cached := sha256.Sum256(append(msg, sig...))
+	rwMutex.RLock()
+	_, exists := cachedVerifiedMap[cached]
+	rwMutex.RUnlock()
+	if exists {
+		return nil
+	}
 
 	// Compute Hash
 	hashOpt, err := id.getHashOpt(id.msp.cryptoConfig.SignatureHashFamily)
@@ -166,6 +180,9 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
 	} else if !valid {
 		return errors.New("The signature is invalid")
 	}
+	rwMutex.Lock()
+	cachedVerifiedMap[cached] = struct{}{}
+	rwMutex.Unlock()
 
 	return nil
 }

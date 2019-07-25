@@ -9,16 +9,18 @@ package service
 import (
 	"sync"
 
+	"github.com/hyperledger/fabric/common/metrics"
 	"github.com/hyperledger/fabric/core/committer"
 	"github.com/hyperledger/fabric/core/committer/txvalidator"
 	"github.com/hyperledger/fabric/core/common/privdata"
-	"github.com/hyperledger/fabric/core/deliverservice"
+	deliverclient "github.com/hyperledger/fabric/core/deliverservice"
 	"github.com/hyperledger/fabric/core/deliverservice/blocksprovider"
 	"github.com/hyperledger/fabric/gossip/api"
 	gossipCommon "github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/election"
 	"github.com/hyperledger/fabric/gossip/gossip"
 	"github.com/hyperledger/fabric/gossip/integration"
+	gossipMetrics "github.com/hyperledger/fabric/gossip/metrics"
 	privdata2 "github.com/hyperledger/fabric/gossip/privdata"
 	"github.com/hyperledger/fabric/gossip/state"
 	"github.com/hyperledger/fabric/gossip/util"
@@ -47,7 +49,7 @@ type GossipService interface {
 	// NewConfigEventer creates a ConfigProcessor which the channelconfig.BundleSource can ultimately route config updates to
 	NewConfigEventer() ConfigProcessor
 	// InitializeChannel allocates the state provider and should be invoked once per channel per execution
-	InitializeChannel(chainID string, endpoints []string, support Support)
+	InitializeChannel(chainID string, oac OrdererAddressConfig, support Support)
 	// AddPayload appends message payload to for given chain
 	AddPayload(chainID string, payload *gproto.Payload) error
 }
@@ -55,21 +57,31 @@ type GossipService interface {
 // DeliveryServiceFactory factory to create and initialize delivery service instance
 type DeliveryServiceFactory interface {
 	// Returns an instance of delivery client
-	Service(g GossipService, endpoints []string, msc api.MessageCryptoService) (deliverclient.DeliverService, error)
+	Service(g GossipService, oac OrdererAddressConfig, msc api.MessageCryptoService) (deliverclient.DeliverService, error)
 }
 
 type deliveryFactoryImpl struct {
 }
 
 // Returns an instance of delivery client
-func (*deliveryFactoryImpl) Service(g GossipService, endpoints []string, mcs api.MessageCryptoService) (deliverclient.DeliverService, error) {
+func (*deliveryFactoryImpl) Service(g GossipService, ec OrdererAddressConfig, mcs api.MessageCryptoService) (deliverclient.DeliverService, error) {
 	return deliverclient.NewDeliverService(&deliverclient.Config{
 		CryptoSvc:   mcs,
 		Gossip:      g,
-		Endpoints:   endpoints,
 		ConnFactory: deliverclient.DefaultConnectionFactory,
 		ABCFactory:  deliverclient.DefaultABCFactory,
+	}, deliverclient.ConnectionCriteria{
+		OrdererEndpointsByOrg: ec.AddressesByOrg,
+		Organizations:         ec.Organizations,
+		OrdererEndpoints:      ec.Addresses,
 	})
+}
+
+// OrdererAddressConfig defines the addresses of the ordering service nodes
+type OrdererAddressConfig struct {
+	Addresses      []string
+	AddressesByOrg map[string][]string
+	Organizations  []string
 }
 
 type privateHandler struct {
@@ -95,6 +107,7 @@ type gossipServiceImpl struct {
 	mcs             api.MessageCryptoService
 	peerIdentity    []byte
 	secAdv          api.SecurityAdvisor
+	metrics         *gossipMetrics.GossipMetrics
 }
 
 // This is an implementation of api.JoinChannelMessage.
@@ -126,20 +139,21 @@ func (jcm *joinChannelMessage) AnchorPeersOf(org api.OrgIdentityType) []api.Anch
 var logger = util.GetLogger(util.ServiceLogger, "")
 
 // InitGossipService initialize gossip service
-func InitGossipService(peerIdentity []byte, endpoint string, s *grpc.Server, certs *gossipCommon.TLSCertificates,
-	mcs api.MessageCryptoService, secAdv api.SecurityAdvisor, secureDialOpts api.PeerSecureDialOpts, bootPeers ...string) error {
+func InitGossipService(peerIdentity []byte, metricsProvider metrics.Provider, endpoint string, s *grpc.Server,
+	certs *gossipCommon.TLSCertificates, mcs api.MessageCryptoService, secAdv api.SecurityAdvisor,
+	secureDialOpts api.PeerSecureDialOpts, bootPeers ...string) error {
 	// TODO: Remove this.
 	// TODO: This is a temporary work-around to make the gossip leader election module load its logger at startup
 	// TODO: in order for the flogging package to register this logger in time so it can set the log levels as requested in the config
 	util.GetLogger(util.ElectionLogger, "")
-	return InitGossipServiceCustomDeliveryFactory(peerIdentity, endpoint, s, certs, &deliveryFactoryImpl{},
+	return InitGossipServiceCustomDeliveryFactory(peerIdentity, metricsProvider, endpoint, s, certs, &deliveryFactoryImpl{},
 		mcs, secAdv, secureDialOpts, bootPeers...)
 }
 
 // InitGossipServiceCustomDeliveryFactory initialize gossip service with customize delivery factory
 // implementation, might be useful for testing and mocking purposes
-func InitGossipServiceCustomDeliveryFactory(peerIdentity []byte, endpoint string, s *grpc.Server,
-	certs *gossipCommon.TLSCertificates, factory DeliveryServiceFactory, mcs api.MessageCryptoService,
+func InitGossipServiceCustomDeliveryFactory(peerIdentity []byte, metricsProvider metrics.Provider, endpoint string,
+	s *grpc.Server, certs *gossipCommon.TLSCertificates, factory DeliveryServiceFactory, mcs api.MessageCryptoService,
 	secAdv api.SecurityAdvisor, secureDialOpts api.PeerSecureDialOpts, bootPeers ...string) error {
 	var err error
 	var gossip gossip.Gossip
@@ -150,8 +164,10 @@ func InitGossipServiceCustomDeliveryFactory(peerIdentity []byte, endpoint string
 
 		logger.Info("Initialize gossip with endpoint", endpoint, "and bootstrap set", bootPeers)
 
+		gossipMetrics := gossipMetrics.NewGossipMetrics(metricsProvider)
+
 		gossip, err = integration.NewGossipComponent(peerIdentity, endpoint, s, secAdv,
-			mcs, secureDialOpts, certs, bootPeers...)
+			mcs, secureDialOpts, certs, gossipMetrics, bootPeers...)
 		gossipServiceInstance = &gossipServiceImpl{
 			mcs:             mcs,
 			gossipSvc:       gossip,
@@ -162,6 +178,7 @@ func InitGossipServiceCustomDeliveryFactory(peerIdentity []byte, endpoint string
 			deliveryFactory: factory,
 			peerIdentity:    peerIdentity,
 			secAdv:          secAdv,
+			metrics:         gossipMetrics,
 		}
 	})
 	return errors.WithStack(err)
@@ -207,6 +224,7 @@ type Support struct {
 	Store                privdata2.TransientStore
 	Cs                   privdata.CollectionStore
 	IdDeserializeFactory privdata2.IdentityDeserializerFactory
+	Capabilities         privdata2.AppCapabilities
 }
 
 // DataStoreSupport aggregates interfaces capable
@@ -217,7 +235,7 @@ type DataStoreSupport struct {
 }
 
 // InitializeChannel allocates the state provider and should be invoked once per channel per execution
-func (g *gossipServiceImpl) InitializeChannel(chainID string, endpoints []string, support Support) {
+func (g *gossipServiceImpl) InitializeChannel(chainID string, oac OrdererAddressConfig, support Support) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	// Initialize new state provider for given committer
@@ -234,8 +252,14 @@ func (g *gossipServiceImpl) InitializeChannel(chainID string, endpoints []string
 	// Initialize private data fetcher
 	dataRetriever := privdata2.NewDataRetriever(storeSupport)
 	collectionAccessFactory := privdata2.NewCollectionAccessFactory(support.IdDeserializeFactory)
-	fetcher := privdata2.NewPuller(support.Cs, g.gossipSvc, dataRetriever, collectionAccessFactory, chainID)
+	fetcher := privdata2.NewPuller(g.metrics.PrivdataMetrics, support.Cs, g.gossipSvc, dataRetriever,
+		collectionAccessFactory, chainID, privdata2.GetBtlPullMargin())
 
+	coordinatorConfig := privdata2.CoordinatorConfig{
+		TransientBlockRetention:        privdata2.GetTransientBlockRetention(),
+		PullRetryThreshold:             viper.GetDuration("peer.gossip.pvtData.pullRetryThreshold"),
+		SkipPullingInvalidTransactions: viper.GetBool("peer.gossip.pvtData.skipPullingInvalidTransactionsDuringCommit"),
+	}
 	coordinator := privdata2.NewCoordinator(privdata2.Support{
 		ChainID:         chainID,
 		CollectionStore: support.Cs,
@@ -243,29 +267,33 @@ func (g *gossipServiceImpl) InitializeChannel(chainID string, endpoints []string
 		TransientStore:  support.Store,
 		Committer:       support.Committer,
 		Fetcher:         fetcher,
-	}, g.createSelfSignedData())
+		AppCapabilities: support.Capabilities,
+	}, g.createSelfSignedData(), g.metrics.PrivdataMetrics, coordinatorConfig)
 
 	reconcilerConfig := privdata2.GetReconcilerConfig()
 	var reconciler privdata2.PvtDataReconciler
 
 	if reconcilerConfig.IsEnabled {
-		reconciler = privdata2.NewReconciler(support.Committer, fetcher, reconcilerConfig)
+		reconciler = privdata2.NewReconciler(chainID, g.metrics.PrivdataMetrics,
+			support.Committer, fetcher, reconcilerConfig)
 	} else {
 		reconciler = &privdata2.NoOpReconciler{}
 	}
 
+	pushAckTimeout := viper.GetDuration("peer.gossip.pvtData.pushAckTimeout")
 	g.privateHandlers[chainID] = privateHandler{
 		support:     support,
 		coordinator: coordinator,
-		distributor: privdata2.NewDistributor(chainID, g, collectionAccessFactory),
+		distributor: privdata2.NewDistributor(chainID, g, collectionAccessFactory, g.metrics.PrivdataMetrics, pushAckTimeout),
 		reconciler:  reconciler,
 	}
 	g.privateHandlers[chainID].reconciler.Start()
 
-	g.chains[chainID] = state.NewGossipStateProvider(chainID, servicesAdapter, coordinator)
+	g.chains[chainID] = state.NewGossipStateProvider(chainID, servicesAdapter, coordinator,
+		g.metrics.StateMetrics, getStateConfiguration())
 	if g.deliveryService[chainID] == nil {
 		var err error
-		g.deliveryService[chainID], err = g.deliveryFactory.Service(g, endpoints, g.mcs)
+		g.deliveryService[chainID], err = g.deliveryFactory.Service(g, oac, g.mcs)
 		if err != nil {
 			logger.Warningf("Cannot create delivery client, due to %+v", errors.WithStack(err))
 		}
@@ -289,7 +317,8 @@ func (g *gossipServiceImpl) InitializeChannel(chainID string, endpoints []string
 
 		if leaderElection {
 			logger.Debug("Delivery uses dynamic leader election mechanism, channel", chainID)
-			g.leaderElection[chainID] = g.newLeaderElectionComponent(chainID, g.onStatusChangeFactory(chainID, support.Committer))
+			g.leaderElection[chainID] = g.newLeaderElectionComponent(chainID, g.onStatusChangeFactory(chainID,
+				support.Committer), g.metrics.ElectionMetrics)
 		} else if isStaticOrgLeader {
 			logger.Debug("This peer is configured to connect to ordering service for blocks delivery, channel", chainID)
 			g.deliveryService[chainID].StartDeliverForChannel(chainID, support.Committer, func() {})
@@ -299,6 +328,7 @@ func (g *gossipServiceImpl) InitializeChannel(chainID string, endpoints []string
 	} else {
 		logger.Warning("Delivery client is down won't be able to pull blocks for chain", chainID)
 	}
+
 }
 
 func (g *gossipServiceImpl) createSelfSignedData() common.SignedData {
@@ -323,7 +353,7 @@ func (g *gossipServiceImpl) updateAnchors(config Config) {
 		return
 	}
 	jcm := &joinChannelMessage{seqNum: config.Sequence(), members2AnchorPeers: map[string][]api.AnchorPeer{}}
-	for _, appOrg := range config.Organizations() {
+	for _, appOrg := range config.ApplicationOrgs() {
 		logger.Debug(appOrg.MSPID(), "anchor peers:", appOrg.AnchorPeers())
 		jcm.members2AnchorPeers[appOrg.MSPID()] = []api.AnchorPeer{}
 		for _, ap := range appOrg.AnchorPeers() {
@@ -340,10 +370,10 @@ func (g *gossipServiceImpl) updateAnchors(config Config) {
 	g.JoinChan(jcm, gossipCommon.ChainID(config.ChainID()))
 }
 
-func (g *gossipServiceImpl) updateEndpoints(chainID string, endpoints []string) {
+func (g *gossipServiceImpl) updateEndpoints(chainID string, criteria deliverclient.ConnectionCriteria) {
 	if ds, ok := g.deliveryService[chainID]; ok {
 		logger.Debugf("Updating endpoints for chainID", chainID)
-		if err := ds.UpdateEndpoints(chainID, endpoints); err != nil {
+		if err := ds.UpdateEndpoints(chainID, criteria); err != nil {
 			// The only reason to fail is because of absence of block provider
 			// for given channel id, hence printing a warning will be enough
 			logger.Warningf("Failed to update ordering service endpoints, due to %s", err)
@@ -379,10 +409,17 @@ func (g *gossipServiceImpl) Stop() {
 	g.gossipSvc.Stop()
 }
 
-func (g *gossipServiceImpl) newLeaderElectionComponent(chainID string, callback func(bool)) election.LeaderElectionService {
+func (g *gossipServiceImpl) newLeaderElectionComponent(chainID string, callback func(bool),
+	electionMetrics *gossipMetrics.ElectionMetrics) election.LeaderElectionService {
 	PKIid := g.mcs.GetPKIidOfCert(g.peerIdentity)
-	adapter := election.NewAdapter(g, PKIid, gossipCommon.ChainID(chainID))
-	return election.NewLeaderElectionService(adapter, string(PKIid), callback)
+	adapter := election.NewAdapter(g, PKIid, gossipCommon.ChainID(chainID), electionMetrics)
+	config := election.ElectionConfig{
+		StartupGracePeriod:       util.GetDurationOrDefault("peer.gossip.election.startupGracePeriod", election.DefStartupGracePeriod),
+		MembershipSampleInterval: util.GetDurationOrDefault("peer.gossip.election.membershipSampleInterval", election.DefMembershipSampleInterval),
+		LeaderAliveThreshold:     util.GetDurationOrDefault("peer.gossip.election.leaderAliveThreshold", election.DefLeaderAliveThreshold),
+		LeaderElectionDuration:   util.GetDurationOrDefault("peer.gossip.election.leaderElectionDuration", election.DefLeaderElectionDuration),
+	}
+	return election.NewLeaderElectionService(adapter, string(PKIid), callback, config)
 }
 
 func (g *gossipServiceImpl) amIinChannel(myOrg string, config Config) bool {
@@ -420,8 +457,55 @@ func (g *gossipServiceImpl) onStatusChangeFactory(chainID string, committer bloc
 
 func orgListFromConfig(config Config) []string {
 	var orgList []string
-	for _, appOrg := range config.Organizations() {
+	for _, appOrg := range config.ApplicationOrgs() {
 		orgList = append(orgList, appOrg.MSPID())
 	}
 	return orgList
+}
+
+func getStateConfiguration() *state.Configuration {
+	config := &state.Configuration{
+		AntiEntropyInterval:             state.DefAntiEntropyInterval,
+		AntiEntropyStateResponseTimeout: state.DefAntiEntropyStateResponseTimeout,
+		AntiEntropyBatchSize:            state.DefAntiEntropyBatchSize,
+		MaxBlockDistance:                state.DefMaxBlockDistance,
+		AntiEntropyMaxRetries:           state.DefAntiEntropyMaxRetries,
+		ChannelBufferSize:               state.DefChannelBufferSize,
+		EnableStateTransfer:             true,
+		BlockingMode:                    state.Blocking,
+	}
+
+	if viper.IsSet("peer.gossip.state.checkInterval") {
+		config.AntiEntropyInterval = viper.GetDuration("peer.gossip.state.checkInterval")
+	}
+
+	if viper.IsSet("peer.gossip.state.responseTimeout") {
+		config.AntiEntropyStateResponseTimeout = viper.GetDuration("peer.gossip.state.responseTimeout")
+	}
+
+	if viper.IsSet("peer.gossip.state.batchSize") {
+		config.AntiEntropyBatchSize = uint64(viper.GetInt("peer.gossip.state.batchSize"))
+	}
+
+	if viper.IsSet("peer.gossip.state.blockBufferSize") {
+		config.MaxBlockDistance = viper.GetInt("peer.gossip.state.blockBufferSize")
+	}
+
+	if viper.IsSet("peer.gossip.state.maxRetries") {
+		config.AntiEntropyMaxRetries = viper.GetInt("peer.gossip.state.maxRetries")
+	}
+
+	if viper.IsSet("peer.gossip.state.channelSize") {
+		config.ChannelBufferSize = viper.GetInt("peer.gossip.state.channelSize")
+	}
+
+	if viper.IsSet("peer.gossip.state.enabled") {
+		config.EnableStateTransfer = viper.GetBool("peer.gossip.state.enabled")
+	}
+
+	if viper.GetBool("peer.gossip.nonBlockingCommitMode") {
+		config.BlockingMode = state.NonBlocking
+	}
+
+	return config
 }

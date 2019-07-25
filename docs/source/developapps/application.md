@@ -247,13 +247,13 @@ access this smart contract:
 const contract = await network.getContract('papercontract', 'org.papernet.commercialpaper');
 ```
 
-Note how the application provides a name -- `papercontract` -- and the optional
-namespace of a contract: `org.papernet.commercialpaper`! We see how a
-[namespace](./namespace.html) picks out a particular contract from a chaincode
-file such as `papercontract.js` that contains many contracts. In PaperNet,
-`papercontract.js` was installed and instantiated with the name `papercontract`,
-and if you're interested, [read how](../chaincode4noah.html) to install and
-instantiate a chaincode containing multiple smart contracts.
+Note how the application provides a name -- `papercontract` -- and an explicit
+contract name: `org.papernet.commercialpaper`! We see how a [contract
+name](./contractname.html) picks out one contract from the `papercontract.js`
+chaincode file that contains many contracts. In PaperNet, `papercontract.js` was
+installed and instantiated with the name `papercontract`, and if you're
+interested, read [how](../chaincode4noah.html) to install and instantiate a
+chaincode containing multiple smart contracts.
 
 If our application simultaneously required access to another contract in
 PaperNet or BondNet this would be easy:
@@ -264,8 +264,9 @@ const euroContract = await network.getContract('EuroCommercialPaperContract');
 const bondContract = await network2.getContract('BondContract');
 ```
 
-In these examples, note how we didn't use a qualifying namespace -- we assumed
-only one smart contract per file.
+In these examples, note how we didn't use a qualifying contract name -- we have
+only one smart contract per file, and `getContract()` will use the first
+contract it finds.
 
 Recall the transaction MagnetoCorp uses to issue its first commercial paper:
 
@@ -304,6 +305,11 @@ send the transaction proposal to the right peers in the network, where it can
 get the required endorsements. But the application doesn't need to worry about
 any of this -- it just issues `submitTransaction` and the SDK takes care of it
 all!
+
+Note that the `submitTransaction` API includes a process for listening for
+transaction commits. Listening for commits is required because without it,
+you will not know whether your transaction has successfully been orderered,
+validated, and committed to the ledger.
 
 Let's now turn our attention to how the application handles the response!
 

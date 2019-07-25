@@ -38,7 +38,6 @@ func newChainSupport(
 ) *ChainSupport {
 	// Read in the last block and metadata for the channel
 	lastBlock := blockledger.GetBlock(ledgerResources, ledgerResources.Height()-1)
-
 	metadata, err := utils.GetMetadataFromBlock(lastBlock, cb.BlockMetadataIndex_ORDERER)
 	// Assuming a block created with cb.NewBlock(), this should not
 	// error even if the orderer metadata is an empty byte slice
@@ -144,6 +143,12 @@ func (cs *ChainSupport) ConfigProto() *cb.Config {
 // Sequence passes through to the underlying configtx.Validator
 func (cs *ChainSupport) Sequence() uint64 {
 	return cs.ConfigtxValidator().Sequence()
+}
+
+// Append appends a new block to the ledger in its raw form,
+// unlike WriteBlock that also mutates its metadata.
+func (cs *ChainSupport) Append(block *cb.Block) error {
+	return cs.ledgerResources.ReadWriter.Append(block)
 }
 
 // VerifyBlockSignature verifies a signature of a block.

@@ -16,6 +16,8 @@ import (
 	"github.com/hyperledger/fabric/common/policies"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
+
+	"github.com/pkg/errors"
 )
 
 // ChannelConfigTemplator can be used to generate config templates.
@@ -40,16 +42,15 @@ func NewSystemChannel(support StandardChannelSupport, templator ChannelConfigTem
 }
 
 // CreateSystemChannelFilters creates the set of filters for the ordering system chain.
+//
+// In maintenance mode, require the signature of /Channel/Orderer/Writers. This will filter out configuration
+// changes that are not related to consensus-type migration (e.g on /Channel/Application).
 func CreateSystemChannelFilters(chainCreator ChainCreator, ledgerResources channelconfig.Resources) *RuleSet {
-	ordererConfig, ok := ledgerResources.OrdererConfig()
-	if !ok {
-		logger.Panicf("Cannot create system channel filters without orderer config")
-	}
 	return NewRuleSet([]Rule{
 		EmptyRejectRule,
 		NewExpirationRejectRule(ledgerResources),
-		NewSizeFilter(ordererConfig),
-		NewSigFilter(policies.ChannelWriters, ledgerResources),
+		NewSizeFilter(ledgerResources),
+		NewSigFilter(policies.ChannelWriters, policies.ChannelOrdererWriters, ledgerResources),
 		NewSystemChannelFilter(ledgerResources, chainCreator),
 	})
 }
@@ -101,7 +102,7 @@ func (s *SystemChannel) ProcessConfigUpdateMsg(envConfigUpdate *cb.Envelope) (co
 
 	newChannelConfigEnv, err := bundle.ConfigtxValidator().ProposeConfigUpdate(envConfigUpdate)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.WithMessage(err, fmt.Sprintf("error validating channel creation transaction for new channel '%s', could not succesfully apply update to template configuration", channelID))
 	}
 
 	newChannelEnvConfig, err := utils.CreateSignedEnvelope(cb.HeaderType_CONFIG, channelID, s.support.Signer(), newChannelConfigEnv, msgVersion, epoch)
@@ -118,7 +119,7 @@ func (s *SystemChannel) ProcessConfigUpdateMsg(envConfigUpdate *cb.Envelope) (co
 	// just constructed is not too large for our consenter.  It additionally reapplies the signature
 	// check, which although not strictly necessary, is a good sanity check, in case the orderer
 	// has not been configured with the right cert material.  The additional overhead of the signature
-	// check is negligable, as this is the channel creation path and not the normal path.
+	// check is negligible, as this is the channel creation path and not the normal path.
 	err = s.StandardChannel.filters.Apply(wrappedOrdererTransaction)
 	if err != nil {
 		return nil, 0, err

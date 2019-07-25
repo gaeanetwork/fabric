@@ -248,7 +248,7 @@ func SetACLPolicy(network *nwo.Network, channel, policyName, policy string, orde
 	submitter := network.Peer("Org1", "peer0")
 	signer := network.Peer("Org2", "peer0")
 
-	config := nwo.GetConfigBlock(network, submitter, orderer, channel)
+	config := nwo.GetConfig(network, submitter, orderer, channel)
 	updatedConfig := proto.Clone(config).(*common.Config)
 
 	// set the policy
@@ -269,16 +269,10 @@ func SetACLPolicy(network *nwo.Network, channel, policyName, policy string, orde
 func GetTxIDFromBlockFile(blockFile string) string {
 	block := nwo.UnmarshalBlockFromFile(blockFile)
 
-	envelope, err := utils.GetEnvelopeFromBlock(block.Data.Data[0])
+	txID, err := utils.GetOrComputeTxIDFromEnvelope(block.Data.Data[0])
 	Expect(err).NotTo(HaveOccurred())
 
-	payload, err := utils.GetPayload(envelope)
-	Expect(err).NotTo(HaveOccurred())
-
-	chdr, err := utils.UnmarshalChannelHeader(payload.Header.ChannelHeader)
-	Expect(err).NotTo(HaveOccurred())
-
-	return chdr.TxId
+	return txID
 }
 
 // ToCLIChaincodeArgs converts string args to args for use with chaincode calls

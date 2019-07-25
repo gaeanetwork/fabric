@@ -10,11 +10,15 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/pem"
-	"reflect"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hyperledger/fabric/common/channelconfig"
 	"github.com/hyperledger/fabric/common/configtx"
+	"github.com/hyperledger/fabric/common/flogging"
+	"github.com/hyperledger/fabric/common/policies"
+	"github.com/hyperledger/fabric/common/tools/protolator"
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/comm"
 	"github.com/hyperledger/fabric/protos/common"
@@ -42,6 +46,10 @@ func (cbc ConnByCertMap) Put(cert []byte, conn *grpc.ClientConn) {
 // Remove removes the connection that is associated to the given certificate
 func (cbc ConnByCertMap) Remove(cert []byte) {
 	delete(cbc, string(cert))
+}
+
+func (cbc ConnByCertMap) Size() int {
+	return len(cbc)
 }
 
 // MemberMapping defines NetworkMembers by their ID
@@ -98,67 +106,23 @@ func (ss StringSet) subtract(set StringSet) {
 // that are only established if the given predicate
 // is fulfilled
 type PredicateDialer struct {
-	Config atomic.Value
+	lock sync.RWMutex
+	comm.ClientConfig
 }
 
-// NewTLSPinningDialer creates a new PredicateDialer
-func NewTLSPinningDialer(config comm.ClientConfig) *PredicateDialer {
-	d := &PredicateDialer{}
-	d.SetConfig(config)
-	return d
-}
-
-// ClientConfig returns the comm.ClientConfig, or an error
-// if they cannot be extracted.
-func (dialer *PredicateDialer) ClientConfig() (comm.ClientConfig, error) {
-	val := dialer.Config.Load()
-	if val == nil {
-		return comm.ClientConfig{}, errors.New("client config not initialized")
-	}
-	cc, isClientConfig := val.(comm.ClientConfig)
-	if !isClientConfig {
-		err := errors.Errorf("value stored is %v, not comm.ClientConfig",
-			reflect.TypeOf(val))
-		return comm.ClientConfig{}, err
-	}
-	if cc.SecOpts == nil {
-		return comm.ClientConfig{}, errors.New("SecOpts is nil")
-	}
-	// Copy by value the secure options
-	secOpts := *cc.SecOpts
-	return comm.ClientConfig{
-		AsyncConnect: cc.AsyncConnect,
-		Timeout:      cc.Timeout,
-		SecOpts:      &secOpts,
-		KaOpts:       cc.KaOpts,
-	}, nil
-}
-
-// SetConfig sets the configuration of the PredicateDialer
-func (dialer *PredicateDialer) SetConfig(config comm.ClientConfig) {
-	configCopy := comm.ClientConfig{
-		AsyncConnect: config.AsyncConnect,
-		Timeout:      config.Timeout,
-		SecOpts:      &comm.SecureOptions{},
-		KaOpts:       &comm.KeepaliveOptions{},
-	}
-	// Explicitly copy configuration
-	if config.SecOpts != nil {
-		*configCopy.SecOpts = *config.SecOpts
-	}
-	if config.KaOpts != nil {
-		*configCopy.KaOpts = *config.KaOpts
-	} else {
-		configCopy.KaOpts = nil
-	}
-
-	dialer.Config.Store(configCopy)
+func (dialer *PredicateDialer) UpdateRootCAs(serverRootCAs [][]byte) {
+	dialer.lock.Lock()
+	defer dialer.lock.Unlock()
+	dialer.ClientConfig.SecOpts.ServerRootCAs = serverRootCAs
 }
 
 // Dial creates a new gRPC connection that can only be established, if the remote node's
 // certificate chain satisfy verifyFunc
 func (dialer *PredicateDialer) Dial(address string, verifyFunc RemoteVerifier) (*grpc.ClientConn, error) {
-	cfg := dialer.Config.Load().(comm.ClientConfig)
+	dialer.lock.RLock()
+	cfg := dialer.ClientConfig.Clone()
+	dialer.lock.RUnlock()
+
 	cfg.SecOpts.VerifyCertificate = verifyFunc
 	client, err := comm.NewGRPCClient(cfg)
 	if err != nil {
@@ -176,15 +140,23 @@ func DERtoPEM(der []byte) string {
 	}))
 }
 
-// StandardDialer wraps a PredicateDialer
-// to a standard cluster.Dialer that passes in a nil verify function
+// StandardDialer wraps an AtomicClientConfig,
+// and provides a means to connect according to given EndpointCriteria.
 type StandardDialer struct {
-	Dialer *PredicateDialer
+	comm.ClientConfig
 }
 
-// Dial dials to the given address
-func (bdp *StandardDialer) Dial(address string) (*grpc.ClientConn, error) {
-	return bdp.Dialer.Dial(address, nil)
+// Dial dials an address according to the given EndpointCriteria
+func (dialer *StandardDialer) Dial(endpointCriteria EndpointCriteria) (*grpc.ClientConn, error) {
+	cfg := dialer.ClientConfig.Clone()
+	cfg.SecOpts.ServerRootCAs = endpointCriteria.TLSRootCAs
+
+	client, err := comm.NewGRPCClient(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed creating gRPC client")
+	}
+
+	return client.NewConnection(endpointCriteria.Endpoint, "")
 }
 
 //go:generate mockery -dir . -name BlockVerifier -case underscore -output ./mocks/
@@ -202,11 +174,11 @@ type BlockVerifier interface {
 
 // BlockSequenceVerifier verifies that the given consecutive sequence
 // of blocks is valid.
-type BlockSequenceVerifier func([]*common.Block) error
+type BlockSequenceVerifier func(blocks []*common.Block, channel string) error
 
 // Dialer creates a gRPC connection to a remote address
 type Dialer interface {
-	Dial(address string) (*grpc.ClientConn, error)
+	Dial(endpointCriteria EndpointCriteria) (*grpc.ClientConn, error)
 }
 
 // VerifyBlocks verifies the given consecutive sequence of blocks is valid,
@@ -265,6 +237,13 @@ func ConfigFromBlock(block *common.Block) (*common.ConfigEnvelope, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+	if block.Header.Number == 0 {
+		configEnvelope, err := configtx.UnmarshalConfigEnvelope(payload.Data)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid config envelope")
+		}
+		return configEnvelope, nil
+	}
 	if payload.Header == nil {
 		return nil, errors.New("nil header in payload")
 	}
@@ -315,8 +294,8 @@ func VerifyBlockHash(indexInBuffer int, blockBuff []*common.Block) error {
 		if !bytes.Equal(block.Header.PreviousHash, prevBlock.Header.Hash()) {
 			claimedPrevHash := hex.EncodeToString(block.Header.PreviousHash)
 			actualPrevHash := hex.EncodeToString(prevBlock.Header.Hash())
-			return errors.Errorf("block %d's hash (%s) mismatches %d's prev block hash (%s)",
-				currSeq, actualPrevHash, prevSeq, claimedPrevHash)
+			return errors.Errorf("block [%d]'s hash (%s) mismatches %d's prev block hash (%s)",
+				prevSeq, actualPrevHash, currSeq, claimedPrevHash)
 		}
 	}
 	return nil
@@ -360,16 +339,15 @@ func VerifyBlockSignature(block *common.Block, verifier BlockVerifier, config *c
 	return verifier.VerifyBlockSignature(signatureSet, config)
 }
 
-// EndpointConfig defines a configuration
-// of endpoints of ordering service nodes
-type EndpointConfig struct {
-	TLSRootCAs [][]byte
-	Endpoints  []string
+// EndpointCriteria defines criteria of how to connect to a remote orderer node.
+type EndpointCriteria struct {
+	Endpoint   string   // Endpoint of the form host:port
+	TLSRootCAs [][]byte // PEM encoded TLS root CA certificates
 }
 
 // EndpointconfigFromConfigBlock retrieves TLS CA certificates and endpoints
 // from a config block.
-func EndpointconfigFromConfigBlock(block *common.Block) (*EndpointConfig, error) {
+func EndpointconfigFromConfigBlock(block *common.Block) ([]EndpointCriteria, error) {
 	if block == nil {
 		return nil, errors.New("nil block")
 	}
@@ -377,7 +355,7 @@ func EndpointconfigFromConfigBlock(block *common.Block) (*EndpointConfig, error)
 	if err != nil {
 		return nil, err
 	}
-	var tlsCACerts [][]byte
+
 	bundle, err := channelconfig.NewBundleFromEnvelope(envelopeConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed extracting bundle from envelope")
@@ -390,15 +368,273 @@ func EndpointconfigFromConfigBlock(block *common.Block) (*EndpointConfig, error)
 	if !ok {
 		return nil, errors.New("failed obtaining orderer config from bundle")
 	}
+
+	mspIDsToCACerts := make(map[string][][]byte)
+	var aggregatedTLSCerts [][]byte
 	for _, org := range ordererConfig.Organizations() {
-		msp := msps[org.MSPID()]
-		if msp == nil {
+		// Validate that every orderer org has a corresponding MSP instance in the MSP Manager.
+		msp, exists := msps[org.MSPID()]
+		if !exists {
 			return nil, errors.Errorf("no MSP found for MSP with ID of %s", org.MSPID())
 		}
-		tlsCACerts = append(tlsCACerts, msp.GetTLSRootCerts()...)
+
+		// Build a per org mapping of the TLS CA certs for this org,
+		// and aggregate all TLS CA certs into aggregatedTLSCerts to be used later on.
+		var caCerts [][]byte
+		caCerts = append(caCerts, msp.GetTLSIntermediateCerts()...)
+		caCerts = append(caCerts, msp.GetTLSRootCerts()...)
+		mspIDsToCACerts[org.MSPID()] = caCerts
+		aggregatedTLSCerts = append(aggregatedTLSCerts, caCerts...)
 	}
-	return &EndpointConfig{
-		Endpoints:  bundle.ChannelConfig().OrdererAddresses(),
-		TLSRootCAs: tlsCACerts,
+
+	endpointsPerOrg := perOrgEndpoints(ordererConfig, mspIDsToCACerts)
+	if len(endpointsPerOrg) > 0 {
+		return endpointsPerOrg, nil
+	}
+
+	return globalEndpointsFromConfig(aggregatedTLSCerts, bundle), nil
+}
+
+func perOrgEndpoints(ordererConfig channelconfig.Orderer, mspIDsToCerts map[string][][]byte) []EndpointCriteria {
+	var endpointsPerOrg []EndpointCriteria
+
+	for _, org := range ordererConfig.Organizations() {
+		for _, endpoint := range org.Endpoints() {
+			endpointsPerOrg = append(endpointsPerOrg, EndpointCriteria{
+				TLSRootCAs: mspIDsToCerts[org.MSPID()],
+				Endpoint:   endpoint,
+			})
+		}
+	}
+
+	return endpointsPerOrg
+}
+
+func globalEndpointsFromConfig(aggregatedTLSCerts [][]byte, bundle *channelconfig.Bundle) []EndpointCriteria {
+	var globalEndpoints []EndpointCriteria
+	for _, endpoint := range bundle.ChannelConfig().OrdererAddresses() {
+		globalEndpoints = append(globalEndpoints, EndpointCriteria{
+			Endpoint:   endpoint,
+			TLSRootCAs: aggregatedTLSCerts,
+		})
+	}
+	return globalEndpoints
+}
+
+//go:generate mockery -dir . -name VerifierFactory -case underscore -output ./mocks/
+
+// VerifierFactory creates BlockVerifiers.
+type VerifierFactory interface {
+	// VerifierFromConfig creates a BlockVerifier from the given configuration.
+	VerifierFromConfig(configuration *common.ConfigEnvelope, channel string) (BlockVerifier, error)
+}
+
+// VerificationRegistry registers verifiers and retrieves them.
+type VerificationRegistry struct {
+	LoadVerifier       func(chain string) BlockVerifier
+	Logger             *flogging.FabricLogger
+	VerifierFactory    VerifierFactory
+	VerifiersByChannel map[string]BlockVerifier
+}
+
+// RegisterVerifier adds a verifier into the registry if applicable.
+func (vr *VerificationRegistry) RegisterVerifier(chain string) {
+	if _, exists := vr.VerifiersByChannel[chain]; exists {
+		vr.Logger.Debugf("No need to register verifier for chain %s", chain)
+		return
+	}
+
+	v := vr.LoadVerifier(chain)
+	if v == nil {
+		vr.Logger.Errorf("Failed loading verifier for chain %s", chain)
+		return
+	}
+
+	vr.VerifiersByChannel[chain] = v
+	vr.Logger.Infof("Registered verifier for chain %s", chain)
+}
+
+// RetrieveVerifier returns a BlockVerifier for the given channel, or nil if not found.
+func (vr *VerificationRegistry) RetrieveVerifier(channel string) BlockVerifier {
+	verifier, exists := vr.VerifiersByChannel[channel]
+	if exists {
+		return verifier
+	}
+	vr.Logger.Errorf("No verifier for channel %s exists", channel)
+	return nil
+}
+
+// BlockCommitted notifies the VerificationRegistry upon a block commit, which may
+// trigger a registration of a verifier out of the block in case the block is a config block.
+func (vr *VerificationRegistry) BlockCommitted(block *common.Block, channel string) {
+	conf, err := ConfigFromBlock(block)
+	// The block doesn't contain a config block, but is a valid block
+	if err == errNotAConfig {
+		vr.Logger.Debugf("Committed block [%d] for channel %s that is not a config block",
+			block.Header.Number, channel)
+		return
+	}
+	// The block isn't a valid block
+	if err != nil {
+		vr.Logger.Errorf("Failed parsing block of channel %s: %v, content: %s",
+			channel, err, BlockToString(block))
+		return
+	}
+
+	// The block contains a config block
+	verifier, err := vr.VerifierFactory.VerifierFromConfig(conf, channel)
+	if err != nil {
+		vr.Logger.Errorf("Failed creating a verifier from a config block for channel %s: %v, content: %s",
+			channel, err, BlockToString(block))
+		return
+	}
+
+	vr.VerifiersByChannel[channel] = verifier
+
+	vr.Logger.Debugf("Committed config block [%d] for channel %s", block.Header.Number, channel)
+}
+
+// BlockToString returns a string representation of this block.
+func BlockToString(block *common.Block) string {
+	buff := &bytes.Buffer{}
+	protolator.DeepMarshalJSON(buff, block)
+	return buff.String()
+}
+
+// BlockCommitFunc signals a block commit.
+type BlockCommitFunc func(block *common.Block, channel string)
+
+// LedgerInterceptor intercepts block commits.
+type LedgerInterceptor struct {
+	Channel              string
+	InterceptBlockCommit BlockCommitFunc
+	LedgerWriter
+}
+
+// Append commits a block into the ledger, and also fires the configured callback.
+func (interceptor *LedgerInterceptor) Append(block *common.Block) error {
+	defer interceptor.InterceptBlockCommit(block, interceptor.Channel)
+	return interceptor.LedgerWriter.Append(block)
+}
+
+// BlockVerifierAssembler creates a BlockVerifier out of a config envelope
+type BlockVerifierAssembler struct {
+	Logger *flogging.FabricLogger
+}
+
+// VerifierFromConfig creates a BlockVerifier from the given configuration.
+func (bva *BlockVerifierAssembler) VerifierFromConfig(configuration *common.ConfigEnvelope, channel string) (BlockVerifier, error) {
+	bundle, err := channelconfig.NewBundle(channel, configuration.Config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed extracting bundle from envelope")
+	}
+	policyMgr := bundle.PolicyManager()
+
+	return &BlockValidationPolicyVerifier{
+		Logger:    bva.Logger,
+		PolicyMgr: policyMgr,
+		Channel:   channel,
 	}, nil
+}
+
+// BlockValidationPolicyVerifier verifies signatures based on the block validation policy.
+type BlockValidationPolicyVerifier struct {
+	Logger    *flogging.FabricLogger
+	Channel   string
+	PolicyMgr policies.Manager
+}
+
+// VerifyBlockSignature verifies the signed data associated to a block, optionally with the given config envelope.
+func (bv *BlockValidationPolicyVerifier) VerifyBlockSignature(sd []*common.SignedData, envelope *common.ConfigEnvelope) error {
+	policyMgr := bv.PolicyMgr
+	// If the envelope passed isn't nil, we should use a different policy manager.
+	if envelope != nil {
+		bundle, err := channelconfig.NewBundle(bv.Channel, envelope.Config)
+		if err != nil {
+			buff := &bytes.Buffer{}
+			protolator.DeepMarshalJSON(buff, envelope.Config)
+			bv.Logger.Errorf("Failed creating a new bundle for channel %s, Config content is: %s", bv.Channel, buff.String())
+			return err
+		}
+		bv.Logger.Infof("Initializing new PolicyManager for channel %s", bv.Channel)
+		policyMgr = bundle.PolicyManager()
+	}
+	policy, exists := policyMgr.GetPolicy(policies.BlockValidation)
+	if !exists {
+		return errors.Errorf("policy %s wasn't found", policies.BlockValidation)
+	}
+	return policy.Evaluate(sd)
+}
+
+//go:generate mockery -dir . -name BlockRetriever -case underscore -output ./mocks/
+
+// BlockRetriever retrieves blocks
+type BlockRetriever interface {
+	// Block returns a block with the given number,
+	// or nil if such a block doesn't exist.
+	Block(number uint64) *common.Block
+}
+
+// LastConfigBlock returns the last config block relative to the given block.
+func LastConfigBlock(block *common.Block, blockRetriever BlockRetriever) (*common.Block, error) {
+	if block == nil {
+		return nil, errors.New("nil block")
+	}
+	if blockRetriever == nil {
+		return nil, errors.New("nil blockRetriever")
+	}
+	if block.Metadata == nil || len(block.Metadata.Metadata) <= int(common.BlockMetadataIndex_LAST_CONFIG) {
+		return nil, errors.New("no metadata in block")
+	}
+	lastConfigBlockNum, err := utils.GetLastConfigIndexFromBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	lastConfigBlock := blockRetriever.Block(lastConfigBlockNum)
+	if lastConfigBlock == nil {
+		return nil, errors.Errorf("unable to retrieve last config block [%d]", lastConfigBlockNum)
+	}
+	return lastConfigBlock, nil
+}
+
+// StreamCountReporter reports the number of streams currently connected to this node
+type StreamCountReporter struct {
+	Metrics *Metrics
+	count   uint32
+}
+
+func (scr *StreamCountReporter) Increment() {
+	count := atomic.AddUint32(&scr.count, 1)
+	scr.Metrics.reportStreamCount(count)
+}
+
+func (scr *StreamCountReporter) Decrement() {
+	count := atomic.AddUint32(&scr.count, ^uint32(0))
+	scr.Metrics.reportStreamCount(count)
+}
+
+type certificateExpirationCheck struct {
+	minimumExpirationWarningInterval time.Duration
+	expiresAt                        time.Time
+	expirationWarningThreshold       time.Duration
+	lastWarning                      time.Time
+	nodeName                         string
+	endpoint                         string
+	alert                            func(string, ...interface{})
+}
+
+func (exp *certificateExpirationCheck) checkExpiration(currentTime time.Time, channel string) {
+	timeLeft := exp.expiresAt.Sub(currentTime)
+	if timeLeft > exp.expirationWarningThreshold {
+		return
+	}
+
+	timeSinceLastWarning := currentTime.Sub(exp.lastWarning)
+	if timeSinceLastWarning < exp.minimumExpirationWarningInterval {
+		return
+	}
+
+	exp.alert("Certificate of %s from %s for channel %s expires in less than %v",
+		exp.nodeName, exp.endpoint, channel, timeLeft)
+	exp.lastWarning = currentTime
 }

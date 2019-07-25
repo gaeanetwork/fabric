@@ -5,6 +5,7 @@ Operations Guides
    :maxdepth: 1
 
    upgrade_to_newest_version
+   orderer_deploy
    config_update
    msp
    configtx
@@ -18,4 +19,6 @@ Operations Guides
    error-handling
    logging-control
    enable_tls
+   raft_configuration.md
+   kafka_raft_migration.md
    kafka

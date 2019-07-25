@@ -129,7 +129,10 @@ func GetServerConfig() (comm.ServerConfig, error) {
 	secureOptions := &comm.SecureOptions{
 		UseTLS: viper.GetBool("peer.tls.enabled"),
 	}
-	serverConfig := comm.ServerConfig{SecOpts: secureOptions}
+	serverConfig := comm.ServerConfig{
+		ConnectionTimeout: viper.GetDuration("peer.connectiontimeout"),
+		SecOpts:           secureOptions,
+	}
 	if secureOptions.UseTLS {
 		// get the certs from the file system
 		serverKey, err := ioutil.ReadFile(config.GetPath("peer.tls.key.file"))
@@ -172,6 +175,30 @@ func GetServerConfig() (comm.ServerConfig, error) {
 		serverConfig.KaOpts.ServerMinInterval = viper.GetDuration("peer.keepalive.minInterval")
 	}
 	return serverConfig, nil
+}
+
+// GetServerRootCAs returns the root certificates which will be trusted for
+// gRPC client connections to peers and orderers.
+func GetServerRootCAs() ([][]byte, error) {
+	var rootCAs [][]byte
+	if config.GetPath("peer.tls.rootcert.file") != "" {
+		rootCert, err := ioutil.ReadFile(config.GetPath("peer.tls.rootcert.file"))
+		if err != nil {
+			return nil, fmt.Errorf("error loading TLS root certificate (%s)", err)
+		}
+		rootCAs = append(rootCAs, rootCert)
+	}
+
+	for _, file := range viper.GetStringSlice("peer.tls.serverRootCAs.files") {
+		rootCert, err := ioutil.ReadFile(
+			config.TranslatePath(filepath.Dir(viper.ConfigFileUsed()), file))
+		if err != nil {
+			return nil,
+				fmt.Errorf("error loading server root CAs: %s", err)
+		}
+		rootCAs = append(rootCAs, rootCert)
+	}
+	return rootCAs, nil
 }
 
 // GetClientCertificate returns the TLS certificate to use for gRPC client

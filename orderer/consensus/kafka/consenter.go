@@ -7,17 +7,24 @@ SPDX-License-Identifier: Apache-2.0
 package kafka
 
 import (
+	"github.com/Shopify/sarama"
+	"github.com/hyperledger/fabric-lib-go/healthz"
 	"github.com/hyperledger/fabric/common/metrics"
-	localconfig "github.com/hyperledger/fabric/orderer/common/localconfig"
+	"github.com/hyperledger/fabric/orderer/common/localconfig"
 	"github.com/hyperledger/fabric/orderer/consensus"
 	cb "github.com/hyperledger/fabric/protos/common"
-
-	"github.com/Shopify/sarama"
-	logging "github.com/op/go-logging"
+	"github.com/op/go-logging"
 )
 
+//go:generate counterfeiter -o mock/health_checker.go -fake-name HealthChecker . healthChecker
+
+// healthChecker defines the contract for health checker
+type healthChecker interface {
+	RegisterChecker(component string, checker healthz.HealthChecker) error
+}
+
 // New creates a Kafka-based consenter. Called by orderer's main.go.
-func New(config localconfig.Kafka, metricsProvider metrics.Provider) (consensus.Consenter, *Metrics) {
+func New(config localconfig.Kafka, metricsProvider metrics.Provider, healthChecker healthChecker) (consensus.Consenter, *Metrics) {
 	if config.Verbose {
 		logging.SetLevel(logging.DEBUG, "orderer.consensus.kafka.sarama")
 	}
@@ -29,6 +36,8 @@ func New(config localconfig.Kafka, metricsProvider metrics.Provider) (consensus.
 		config.Version,
 		defaultPartition)
 
+	metrics := NewMetrics(metricsProvider, brokerConfig.MetricRegistry)
+
 	return &consenterImpl{
 		brokerConfigVal: brokerConfig,
 		tlsConfigVal:    config.TLS,
@@ -38,7 +47,9 @@ func New(config localconfig.Kafka, metricsProvider metrics.Provider) (consensus.
 			NumPartitions:     1,
 			ReplicationFactor: config.Topic.ReplicationFactor,
 		},
-	}, NewMetrics(metricsProvider, brokerConfig.MetricRegistry)
+		healthChecker: healthChecker,
+		metrics:       metrics,
+	}, metrics
 }
 
 // consenterImpl holds the implementation of type that satisfies the
@@ -51,6 +62,8 @@ type consenterImpl struct {
 	kafkaVersionVal sarama.KafkaVersion
 	topicDetailVal  *sarama.TopicDetail
 	metricsProvider metrics.Provider
+	healthChecker   healthChecker
+	metrics         *Metrics
 }
 
 // HandleChain creates/returns a reference to a consensus.Chain object for the
@@ -60,7 +73,12 @@ type consenterImpl struct {
 // existingChains.
 func (consenter *consenterImpl) HandleChain(support consensus.ConsenterSupport, metadata *cb.Metadata) (consensus.Chain, error) {
 	lastOffsetPersisted, lastOriginalOffsetProcessed, lastResubmittedConfigOffset := getOffsets(metadata.Value, support.ChainID())
-	return newChain(consenter, support, lastOffsetPersisted, lastOriginalOffsetProcessed, lastResubmittedConfigOffset)
+	ch, err := newChain(consenter, support, lastOffsetPersisted, lastOriginalOffsetProcessed, lastResubmittedConfigOffset)
+	if err != nil {
+		return nil, err
+	}
+	consenter.healthChecker.RegisterChecker(ch.channel.String(), ch)
+	return ch, nil
 }
 
 // commonConsenter allows us to retrieve the configuration options set on the
@@ -71,6 +89,11 @@ type commonConsenter interface {
 	brokerConfig() *sarama.Config
 	retryOptions() localconfig.Retry
 	topicDetail() *sarama.TopicDetail
+	Metrics() *Metrics
+}
+
+func (consenter *consenterImpl) Metrics() *Metrics {
+	return consenter.metrics
 }
 
 func (consenter *consenterImpl) brokerConfig() *sarama.Config {
@@ -83,9 +106,4 @@ func (consenter *consenterImpl) retryOptions() localconfig.Retry {
 
 func (consenter *consenterImpl) topicDetail() *sarama.TopicDetail {
 	return consenter.topicDetailVal
-}
-
-// closeable allows the shut down of the calling resource.
-type closeable interface {
-	close() error
 }

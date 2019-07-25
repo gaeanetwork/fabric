@@ -8,6 +8,8 @@ package endorser
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/hyperledger/fabric/common/channelconfig"
 	"github.com/hyperledger/fabric/common/crypto"
@@ -147,9 +149,31 @@ func (s *SupportImpl) Execute(txParams *ccprovider.TransactionParams, cid, name,
 	return s.ChaincodeSupport.Execute(txParams, cccid, input)
 }
 
+var (
+	rwMutex                      sync.RWMutex
+	expiredDuration              = 5 * time.Second
+	cachedChaincodeDefinitionMap = make(map[string]cachedChaincodeDefinition)
+)
+
+type cachedChaincodeDefinition struct {
+	cachedAt  time.Time
+	cachedMap ccprovider.ChaincodeDefinition
+}
+
 // GetChaincodeDefinition returns ccprovider.ChaincodeDefinition for the chaincode with the supplied name
 func (s *SupportImpl) GetChaincodeDefinition(chaincodeName string, txsim ledger.QueryExecutor) (ccprovider.ChaincodeDefinition, error) {
-	return s.ChaincodeSupport.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
+	rwMutex.RLock()
+	cachedObj, exists := cachedChaincodeDefinitionMap[chaincodeName]
+	rwMutex.RUnlock()
+	if exists && time.Since(cachedObj.cachedAt) < expiredDuration {
+		return cachedObj.cachedMap, nil
+	}
+
+	chaincodeDefinition, err := s.ChaincodeSupport.Lifecycle.ChaincodeDefinition(chaincodeName, txsim)
+	rwMutex.Lock()
+	cachedChaincodeDefinitionMap[chaincodeName] = cachedChaincodeDefinition{time.Now(), chaincodeDefinition}
+	rwMutex.Unlock()
+	return chaincodeDefinition, err
 }
 
 // CheckACL checks the ACL for the resource for the Channel using the

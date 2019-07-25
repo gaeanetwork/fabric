@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"

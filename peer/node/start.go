@@ -9,6 +9,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +17,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	// to open debug pprof
+	_ "net/http/pprof"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/common/cauthdsl"
@@ -57,7 +61,6 @@ import (
 	endorsement3 "github.com/hyperledger/fabric/core/handlers/endorsement/api/identities"
 	"github.com/hyperledger/fabric/core/handlers/library"
 	validation "github.com/hyperledger/fabric/core/handlers/validation/api"
-	"github.com/hyperledger/fabric/core/ledger"
 	"github.com/hyperledger/fabric/core/ledger/cceventmgmt"
 	"github.com/hyperledger/fabric/core/ledger/kvledger"
 	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
@@ -120,6 +123,10 @@ var nodeStartCmd = &cobra.Command{
 		if len(args) != 0 {
 			return fmt.Errorf("trailing args detected")
 		}
+
+		go func() {
+			log.Println(http.ListenAndServe(":8061", nil))
+		}()
 		// Parsing of the command line is done so silence cmd usage
 		cmd.SilenceUsage = true
 		return serve(args)
@@ -221,12 +228,11 @@ func serve(args []string) error {
 	throttle := comm.NewThrottle(grpcMaxConcurrency)
 	serverConfig.Logger = flogging.MustGetLogger("core.comm").With("server", "PeerServer")
 	serverConfig.MetricsProvider = metricsProvider
-	serverConfig.UnaryInterceptors = append(
-		serverConfig.UnaryInterceptors,
-		grpcmetrics.UnaryServerInterceptor(grpcmetrics.NewUnaryMetrics(metricsProvider)),
-		grpclogging.UnaryServerInterceptor(flogging.MustGetLogger("comm.grpc.server").Zap()),
-		throttle.UnaryServerIntercptor,
-	)
+	// serverConfig.UnaryInterceptors = append(
+	// 	serverConfig.UnaryInterceptors,
+	// 	grpcmetrics.UnaryServerInterceptor(grpcmetrics.NewUnaryMetrics(metricsProvider)),
+	// 	grpclogging.UnaryServerInterceptor(flogging.MustGetLogger("comm.grpc.server").Zap()),
+	// )
 	serverConfig.StreamInterceptors = append(
 		serverConfig.StreamInterceptors,
 		grpcmetrics.StreamServerInterceptor(grpcmetrics.NewStreamMetrics(metricsProvider)),
@@ -813,12 +819,11 @@ func startAdminServer(peerListenAddr string, peerServer *grpc.Server, metricsPro
 		throttle := comm.NewThrottle(grpcMaxConcurrency)
 		serverConfig.Logger = flogging.MustGetLogger("core.comm").With("server", "AdminServer")
 		serverConfig.MetricsProvider = metricsProvider
-		serverConfig.UnaryInterceptors = append(
-			serverConfig.UnaryInterceptors,
-			grpcmetrics.UnaryServerInterceptor(grpcmetrics.NewUnaryMetrics(metricsProvider)),
-			grpclogging.UnaryServerInterceptor(flogging.MustGetLogger("comm.grpc.server").Zap()),
-			throttle.UnaryServerIntercptor,
-		)
+		// serverConfig.UnaryInterceptors = append(
+		// 	serverConfig.UnaryInterceptors,
+		// 	grpcmetrics.UnaryServerInterceptor(grpcmetrics.NewUnaryMetrics(metricsProvider)),
+		// 	grpclogging.UnaryServerInterceptor(flogging.MustGetLogger("comm.grpc.server").Zap()),
+		// )
 		serverConfig.StreamInterceptors = append(
 			serverConfig.StreamInterceptors,
 			grpcmetrics.StreamServerInterceptor(grpcmetrics.NewStreamMetrics(metricsProvider)),

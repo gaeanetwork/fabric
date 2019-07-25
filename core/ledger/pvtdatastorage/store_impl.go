@@ -206,7 +206,8 @@ func (s *store) Prepare(blockNum uint64, pvtData []*ledger.TxPvtData, missingPvt
 	}
 
 	batch.Put(pendingCommitKey, emptyValue)
-	if err := s.db.WriteBatch(batch, true); err != nil {
+	// Make private data batch writes asynchronous
+	if err := s.db.WriteBatch(batch, false); err != nil {
 		return err
 	}
 	s.batchPending = true

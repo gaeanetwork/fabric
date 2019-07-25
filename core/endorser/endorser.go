@@ -389,14 +389,11 @@ func (e *Endorser) preProcess(signedProp *pb.SignedProposal) (*validateResult, e
 
 		// Here we handle uniqueness check and ACLs for proposals targeting a chain
 		// Notice that ValidateProposalMessage has already verified that TxID is computed properly
-		if _, err = e.s.GetTransactionByID(chainID, txid); err == nil {
-			// increment failure due to duplicate transactions. Useful for catching replay attacks in
-			// addition to benign retries
-			e.Metrics.DuplicateTxsFailure.With(meterLabels...).Add(1)
-			err = errors.Errorf("duplicate transaction found [%s]. Creator [%x]", txid, shdr.Creator)
-			vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
-			return vr, err
-		}
+		// if _, err = e.s.GetTransactionByID(chainID, txid); err == nil {
+		// 	err = errors.Errorf("duplicate transaction found [%s]. Creator [%x]", txid, shdr.Creator)
+		// 	vr.resp = &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}
+		// 	return vr, err
+		// }
 
 		// check ACL only for application chaincodes; ACLs
 		// for system chaincodes are checked elsewhere

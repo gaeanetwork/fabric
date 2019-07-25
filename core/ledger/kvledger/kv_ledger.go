@@ -406,10 +406,12 @@ func (l *kvLedger) CommitWithPvtData(pvtdataAndBlock *ledger.BlockAndPvtData, co
 	// History database could be written in parallel with state and/or async as a future optimization,
 	// although it has not been a bottleneck...no need to clutter the log with elapsed duration.
 	if ledgerconfig.IsHistoryDBEnabled() {
-		logger.Debugf("[%s] Committing block [%d] transactions to history database", l.ledgerID, blockNo)
-		if err := l.historyDB.Commit(block); err != nil {
-			panic(errors.WithMessage(err, "Error during commit to history db"))
-		}
+		go func() {
+			logger.Debugf("[%s] Committing block [%d] transactions to history database", l.ledgerID, blockNo)
+			if err := l.historyDB.Commit(block); err != nil {
+				panic(errors.WithMessage(err, "Error during commit to history db"))
+			}
+		}()
 	}
 
 	logger.Infof("[%s] Committed block [%d] with %d transaction(s) in %dms (state_validation=%dms block_and_pvtdata_commit=%dms state_commit=%dms)"+

@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "FplhS/qgoLitr1CDiqUwKI8c0nM=",
+			"path": "github.com/tjfoc/gmsm/sm3",
+			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
+			"revisionTime": "2019-12-25T08:57:16Z"
+		}
+	],
+	"rootPath": "github.com/hyperledger/fabric"
+}

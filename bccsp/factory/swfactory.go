@@ -1,3 +1,5 @@
+package factory
+
 /*
 Copyright IBM Corp. 2016 All Rights Reserved.
 
@@ -13,7 +15,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package factory
 
 import (
 	"github.com/hyperledger/fabric/bccsp"
@@ -38,7 +39,7 @@ func (f *SWFactory) Name() string {
 func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 	// Validate arguments
 	if config == nil || config.SwOpts == nil {
-		return nil, errors.New("Invalid config. It must not be nil.")
+		return nil, errors.New("Invalid config. It must not be nil")
 	}
 
 	swOpts := config.SwOpts
@@ -75,11 +76,12 @@ type SwOpts struct {
 	InmemKeystore *InmemKeystoreOpts `mapstructure:"inmemkeystore,omitempty" json:"inmemkeystore,omitempty"`
 }
 
-// Pluggable Keystores, could add JKS, P12, etc..
+// FileKeystoreOpts Pluggable Keystores, could add JKS, P12, etc..
 type FileKeystoreOpts struct {
 	KeyStorePath string `mapstructure:"keystore" yaml:"KeyStore"`
 }
 
+// DummyKeystoreOpts DummyKeystoreOpts
 type DummyKeystoreOpts struct{}
 
 // InmemKeystoreOpts - empty, as there is no config for the in-memory keystore

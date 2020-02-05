@@ -3,8 +3,28 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "X8ZvRx+HfwcNidwSG4X+SGXO13Q=",
+			"path": "github.com/tjfoc/gmsm/sm2",
+			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
+			"revisionTime": "2019-12-25T08:57:16Z"
+		},
+		{
 			"checksumSHA1": "FplhS/qgoLitr1CDiqUwKI8c0nM=",
 			"path": "github.com/tjfoc/gmsm/sm3",
+			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
+			"revisionTime": "2019-12-25T08:57:16Z"
+		},
+		{
+			"checksumSHA1": "UAbH5s3v5AfEvbGMEQAyzSFCMU0=",
+			"origin": "github.com/tjfoc/gmsm/vendor/golang.org/x/crypto/ripemd160",
+			"path": "golang.org/x/crypto/ripemd160",
+			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
+			"revisionTime": "2019-12-25T08:57:16Z"
+		},
+		{
+			"checksumSHA1": "c2uqM0KcVJ2SFu/9Nt4w63GZ9xo=",
+			"origin": "github.com/tjfoc/gmsm/vendor/golang.org/x/sys/cpu",
+			"path": "golang.org/x/sys/cpu",
 			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
 			"revisionTime": "2019-12-25T08:57:16Z"
 		}

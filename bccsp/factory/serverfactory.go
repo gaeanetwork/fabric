@@ -27,7 +27,6 @@ func (f *ServerFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 		return nil, errors.New("Invalid config. It must not be nil")
 	}
 
-	ks := sw.NewInMemoryKedyStore()
-
+	ks := sw.NewInMemoryKeyStore()
 	return server.New(config.ServerOpts, ks)
 }

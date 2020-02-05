@@ -30,7 +30,6 @@ type FactoryOpts struct {
 	SwOpts       *SwOpts            `mapstructure:"SW,omitempty" json:"SW,omitempty" yaml:"SwOpts"`
 	PluginOpts   *PluginOpts        `mapstructure:"PLUGIN,omitempty" json:"PLUGIN,omitempty" yaml:"PluginOpts"`
 	Pkcs11Opts   *pkcs11.PKCS11Opts `mapstructure:"PKCS11,omitempty" json:"PKCS11,omitempty" yaml:"PKCS11"`
-	ServerOpts   *server.Opts       `mapstructure:"Server,omitempty" json:"server,omitempty" yaml:"server"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -86,15 +85,6 @@ func setFactories(config *FactoryOpts) error {
 		err := initBCCSP(f, config)
 		if err != nil {
 			factoriesInitError = errors.Wrapf(err, "Failed initializing PKCS11.BCCSP %s", factoriesInitError)
-		}
-	}
-
-	// BCCSP ServerOpts
-	if config.ServerOpts != nil {
-		f := &ServerFactory{}
-		err := initBCCSP(f, config)
-		if err != nil {
-			factoriesInitError = errors.Wrapf(err, "Failed initializing Server.BCCSP %s", factoriesInitError)
 		}
 	}
 

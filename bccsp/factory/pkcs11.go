@@ -20,6 +20,7 @@ package factory
 import (
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/pkcs11"
+	"github.com/hyperledger/fabric/bccsp/server"
 	"github.com/pkg/errors"
 )
 
@@ -29,6 +30,7 @@ type FactoryOpts struct {
 	SwOpts       *SwOpts            `mapstructure:"SW,omitempty" json:"SW,omitempty" yaml:"SwOpts"`
 	PluginOpts   *PluginOpts        `mapstructure:"PLUGIN,omitempty" json:"PLUGIN,omitempty" yaml:"PluginOpts"`
 	Pkcs11Opts   *pkcs11.PKCS11Opts `mapstructure:"PKCS11,omitempty" json:"PKCS11,omitempty" yaml:"PKCS11"`
+	ServerOpts   *server.Opts       `mapstructure:"Server,omitempty" json:"server,omitempty" yaml:"server"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -87,6 +89,15 @@ func setFactories(config *FactoryOpts) error {
 		}
 	}
 
+	// BCCSP ServerOpts
+	if config.ServerOpts != nil {
+		f := &ServerFactory{}
+		err := initBCCSP(f, config)
+		if err != nil {
+			factoriesInitError = errors.Wrapf(err, "Failed initializing Server.BCCSP %s", factoriesInitError)
+		}
+	}
+
 	var ok bool
 	defaultBCCSP, ok = bccspMap[config.ProviderName]
 	if !ok {
@@ -100,12 +111,14 @@ func setFactories(config *FactoryOpts) error {
 func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	var f BCCSPFactory
 	switch config.ProviderName {
-	case "SW":
+	case SoftwareBasedFactoryName:
 		f = &SWFactory{}
-	case "PKCS11":
+	case PKCS11BasedFactoryName:
 		f = &PKCS11Factory{}
-	case "PLUGIN":
+	case PluginFactoryName:
 		f = &PluginFactory{}
+	case ServerBasedFactoryName:
+		f = &ServerFactory{}
 	default:
 		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", config.ProviderName)
 	}

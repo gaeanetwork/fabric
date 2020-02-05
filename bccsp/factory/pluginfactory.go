@@ -1,9 +1,10 @@
+package factory
+
 /*
 Copyright IBM Corp. All Rights Reserved.
 
 SPDX-License-Identifier: Apache-2.0
 */
-package factory
 
 import (
 	"errors"
@@ -39,7 +40,7 @@ func (f *PluginFactory) Name() string {
 func (f *PluginFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 	// check for valid config
 	if config == nil || config.PluginOpts == nil {
-		return nil, errors.New("Invalid config. It must not be nil.")
+		return nil, errors.New("Invalid config. It must not be nil")
 	}
 
 	// Library is required property

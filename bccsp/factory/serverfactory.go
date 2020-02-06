@@ -24,7 +24,7 @@ func (f *ServerFactory) Name() string {
 func (f *ServerFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 	// Validate arguments
 	if config == nil || config.ServerOpts == nil {
-		return nil, errors.New("Invalid config. It must not be nil")
+		return nil, errors.New("Invalid config. ServerOpts must not be nil")
 	}
 
 	ks := sw.NewInMemoryKeyStore()

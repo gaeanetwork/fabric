@@ -15,6 +15,12 @@
 			"revisionTime": "2019-12-25T08:57:16Z"
 		},
 		{
+			"checksumSHA1": "TTrkUr1uXB8Cw5m0bUQr0IMH7WE=",
+			"path": "github.com/tjfoc/gmsm/sm4",
+			"revision": "867dc485371b4d1165d1f63faafa71fa031364b3",
+			"revisionTime": "2019-12-25T08:57:16Z"
+		},
+		{
 			"checksumSHA1": "UAbH5s3v5AfEvbGMEQAyzSFCMU0=",
 			"origin": "github.com/tjfoc/gmsm/vendor/golang.org/x/crypto/ripemd160",
 			"path": "golang.org/x/crypto/ripemd160",

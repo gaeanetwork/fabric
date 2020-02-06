@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"hash"
 
+	"github.com/tjfoc/gmsm/sm3"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -30,6 +31,7 @@ type config struct {
 	hashFunction  func() hash.Hash
 	aesBitLength  int
 	rsaBitLength  int
+	sm4BitLength  int
 }
 
 func (conf *config) setSecurityLevel(securityLevel int, hashFamily string) (err error) {
@@ -38,6 +40,8 @@ func (conf *config) setSecurityLevel(securityLevel int, hashFamily string) (err 
 		err = conf.setSecurityLevelSHA2(securityLevel)
 	case "SHA3":
 		err = conf.setSecurityLevelSHA3(securityLevel)
+	case "SM3":
+		err = conf.setSecurityLevelSM3()
 	default:
 		err = fmt.Errorf("Hash Family not supported [%s]", hashFamily)
 	}
@@ -77,5 +81,11 @@ func (conf *config) setSecurityLevelSHA3(level int) (err error) {
 	default:
 		err = fmt.Errorf("Security level not supported [%d]", level)
 	}
+	return
+}
+
+func (conf *config) setSecurityLevelSM3() (err error) {
+	conf.hashFunction = sm3.New
+	conf.sm4BitLength = 16
 	return
 }

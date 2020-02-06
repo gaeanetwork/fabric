@@ -16,10 +16,10 @@ func TestServerFactoryGetInvalidArgs(t *testing.T) {
 	f := &ServerFactory{}
 
 	_, err := f.Get(nil)
-	assert.Error(t, err, "Invalid config. It must not be nil.")
+	assert.Error(t, err, "Invalid config. ServerOpts must not be nil")
 
 	_, err = f.Get(&FactoryOpts{})
-	assert.Error(t, err, "Invalid config. It must not be nil.")
+	assert.Error(t, err, "Invalid config. ServerOpts must not be nil")
 
 	opts := &FactoryOpts{
 		ServerOpts: &server.Opts{},

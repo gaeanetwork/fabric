@@ -71,8 +71,7 @@ type Opts struct {
 	// PKCS11 options
 	HTTPServer string `mapstructure:"httpserver" json:"httpserver"`
 	Protocol   string `mapstructure:"protocol" json:"protocol"`
-	CertName   string `mapstructure:"certName" json:"certName"`
-	CertB64    string `mapstructure:"certB64" json:"certB64"`
+	CertID     int64  `mapstructure:"certID" json:"certID"`
 	AppKey     string `mapstructure:"appKey" json:"appKey"`
 	AppSecret  string `mapstructure:"appSecret" json:"appSecret"`
 }

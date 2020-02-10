@@ -14,7 +14,7 @@ type impl struct {
 
 	HTTPServer string
 	Protocol   string
-	CertB64    string
+	CertID     int64
 	AppKey     string
 	AppSecret  string
 }

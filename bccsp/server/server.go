@@ -25,6 +25,6 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 		return nil, errors.New("Invalid bccsp.KeyStore instance. It must be different from nil")
 	}
 
-	csp := &impl{swCSP, conf, keyStore, opts.HTTPServer, opts.Protocol, opts.CertB64, opts.AppKey, opts.AppSecret}
+	csp := &impl{swCSP, conf, keyStore, opts.HTTPServer, opts.Protocol, opts.CertID, opts.AppKey, opts.AppSecret}
 	return csp, nil
 }

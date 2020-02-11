@@ -2,10 +2,10 @@ package server
 
 import "github.com/hyperledger/fabric/bccsp"
 
-func (csp *impl) signSM2(k sm2PrivateKey, digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
-	return nil, nil
+func (csp *impl) signSM2(digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
+	return csp.singData(digest)
 }
 
-func (csp *impl) verifySM2(k sm2PublicKey, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
-	return true, nil
+func (csp *impl) verifySM2(signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
+	return csp.verifySignedData(digest, signature)
 }

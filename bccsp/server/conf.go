@@ -68,6 +68,11 @@ type Opts struct {
 	// FileKeystore  *FileKeystoreOpts  `mapstructure:"filekeystore,omitempty" json:"filekeystore,omitempty"`
 	// DummyKeystore *DummyKeystoreOpts `mapstructure:"dummykeystore,omitempty" json:"dummykeystore,omitempty"`
 
+	DefaultOpts string `mapstructure:"default" json:"default"`
+}
+
+// HBCAOpts hbca opts
+type HBCAOpts struct {
 	// PKCS11 options
 	HTTPServer string `mapstructure:"httpserver" json:"httpserver"`
 	Protocol   string `mapstructure:"protocol" json:"protocol"`

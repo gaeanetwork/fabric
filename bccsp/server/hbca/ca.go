@@ -1,4 +1,4 @@
-package server
+package hbca
 
 import (
 	"encoding/base64"
@@ -8,7 +8,7 @@ import (
 	"github.com/tjfoc/gmsm/sm2"
 )
 
-func (csp *impl) getCertBase64() (string, error) {
+func (csp *HuBeiCa) getCertBase64() (string, error) {
 	mapData := make(map[string]interface{})
 	mapData["id"] = csp.CertID
 	mapData["appKey"] = csp.AppKey
@@ -27,7 +27,7 @@ func (csp *impl) getCertBase64() (string, error) {
 	return res.Message, nil
 }
 
-func (csp *impl) getCertInfo() (*sm2.Certificate, error) {
+func (csp *HuBeiCa) getCertInfo() (*sm2.Certificate, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return nil, errors.Wrap(err, "csp.getCertBase64()")
@@ -45,7 +45,7 @@ func (csp *impl) getCertInfo() (*sm2.Certificate, error) {
 	return cert, nil
 }
 
-func (csp *impl) getCertTheme() (string, error) {
+func (csp *HuBeiCa) getCertTheme() (string, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return "", errors.Wrap(err, "csp.getCertBase64()")
@@ -70,7 +70,7 @@ func (csp *impl) getCertTheme() (string, error) {
 	return res.Message, nil
 }
 
-func (csp *impl) getCertSerialNumber() (string, error) {
+func (csp *HuBeiCa) getCertSerialNumber() (string, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return "", errors.Wrap(err, "csp.getCertBase64()")
@@ -95,7 +95,7 @@ func (csp *impl) getCertSerialNumber() (string, error) {
 	return res.Message, nil
 }
 
-func (csp *impl) getCertIssuerSubject() (string, error) {
+func (csp *HuBeiCa) getCertIssuerSubject() (string, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return "", errors.Wrap(err, "csp.getCertBase64()")
@@ -120,7 +120,7 @@ func (csp *impl) getCertIssuerSubject() (string, error) {
 	return res.Message, nil
 }
 
-func (csp *impl) getCertEntity() (string, error) {
+func (csp *HuBeiCa) getCertEntity() (string, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return "", errors.Wrap(err, "csp.getCertBase64()")
@@ -145,7 +145,7 @@ func (csp *impl) getCertEntity() (string, error) {
 	return res.Message, nil
 }
 
-func (csp *impl) validateCert() (bool, error) {
+func (csp *HuBeiCa) validateCert() (bool, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return false, errors.Wrap(err, "csp.getCertBase64()")
@@ -169,7 +169,7 @@ func (csp *impl) validateCert() (bool, error) {
 	return false, errors.New(res.Message)
 }
 
-func (csp *impl) singData(input []byte) ([]byte, error) {
+func (csp *HuBeiCa) singData(input []byte) ([]byte, error) {
 	mapData := make(map[string]interface{})
 	mapData["signedCertAlias"] = fmt.Sprint(csp.CertID)
 	mapData["appKey"] = csp.AppKey
@@ -194,7 +194,7 @@ func (csp *impl) singData(input []byte) ([]byte, error) {
 	return output, nil
 }
 
-func (csp *impl) verifySignedData(input, signBytes []byte) (bool, error) {
+func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
 	certBase64, err := csp.getCertBase64()
 	if err != nil {
 		return false, errors.Wrap(err, "csp.getCertBase64()")
@@ -222,7 +222,7 @@ func (csp *impl) verifySignedData(input, signBytes []byte) (bool, error) {
 	return true, nil
 }
 
-func (csp *impl) pubKeyEncrypt(input []byte) ([]byte, error) {
+func (csp *HuBeiCa) pubKeyEncrypt(input []byte) ([]byte, error) {
 	mapData := make(map[string]interface{})
 	mapData["encryptCertAlias"] = fmt.Sprint(csp.CertID)
 	mapData["appKey"] = csp.AppKey
@@ -246,7 +246,7 @@ func (csp *impl) pubKeyEncrypt(input []byte) ([]byte, error) {
 	return output, nil
 }
 
-func (csp *impl) priKeyDecrypt(input []byte) ([]byte, error) {
+func (csp *HuBeiCa) priKeyDecrypt(input []byte) ([]byte, error) {
 	mapData := make(map[string]interface{})
 	mapData["decryptCertAlias"] = fmt.Sprint(csp.CertID)
 	mapData["appKey"] = csp.AppKey

@@ -1,4 +1,4 @@
-package server
+package hbca
 
 import (
 	"bytes"
@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testImp() *impl {
-	return &impl{
+func testImp() *HuBeiCa {
+	return &HuBeiCa{
 		Protocol:   "http",
 		HTTPServer: "221.232.224.75:8082",
 		CertID:     109,
@@ -17,8 +17,8 @@ func testImp() *impl {
 	}
 }
 
-func testErrorImp() *impl {
-	return &impl{
+func testErrorImp() *HuBeiCa {
+	return &HuBeiCa{
 		Protocol:   "http",
 		HTTPServer: "221.232.224.75:8082",
 		CertID:     10259,

@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/server/hbca"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/pkg/errors"
 )
@@ -25,6 +26,22 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 		return nil, errors.New("Invalid bccsp.KeyStore instance. It must be different from nil")
 	}
 
-	csp := &impl{swCSP, conf, keyStore, opts.HTTPServer, opts.Protocol, opts.CertID, opts.AppKey, opts.AppSecret}
+	csp := &impl{swCSP, conf, keyStore}
+	switch opts.DefaultOpts {
+	case "hbca":
+		csp.implcsp = newhbca(opts)
+	default:
+		return nil, errors.Wrapf(err, "unsupport opts of server type")
+	}
 	return csp, nil
+}
+
+func newhbca(opts *Opts) bccsp.BCCSP {
+	return &hbca.HuBeiCa{
+		HTTPServer: opts.HTTPServer,
+		Protocol:   opts.Protocol,
+		CertID:     opts.CertID,
+		AppKey:     opts.AppKey,
+		AppSecret:  opts.AppSecret,
+	}
 }

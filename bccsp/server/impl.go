@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"hash"
 
 	"github.com/hyperledger/fabric/bccsp"
 )
@@ -12,11 +13,7 @@ type impl struct {
 	conf *config
 	ks   bccsp.KeyStore
 
-	HTTPServer string
-	Protocol   string
-	CertID     int64
-	AppKey     string
-	AppSecret  string
+	implcsp bccsp.BCCSP
 }
 
 // KeyGen generates a key using opts.
@@ -49,6 +46,17 @@ func (csp *impl) GetKey(ski []byte) (bccsp.Key, error) {
 	return csp.BCCSP.GetKey(ski)
 }
 
+// Hash hashes messages msg using options opts.
+func (csp *impl) Hash(msg []byte, opts bccsp.HashOpts) (digest []byte, err error) {
+	return csp.implcsp.Hash(msg, opts)
+}
+
+// GetHash returns and instance of hash.Hash using options opts.
+// If opts is nil then the default hash function is returned.
+func (csp *impl) GetHash(opts bccsp.HashOpts) (h hash.Hash, err error) {
+	return csp.implcsp.GetHash(opts)
+}
+
 // Sign signs digest using key k.
 // The opts argument should be appropriate for the primitive used.
 //
@@ -60,11 +68,12 @@ func (csp *impl) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]byte
 	if k == nil {
 		return nil, errors.New("Invalid Key. It must not be nil")
 	}
+
 	if len(digest) == 0 {
 		return nil, errors.New("Invalid digest. Cannot be empty")
 	}
 
-	return csp.signSM2(digest, opts)
+	return csp.implcsp.Sign(k, digest, opts)
 }
 
 // Verify verifies signature against key k and digest
@@ -80,18 +89,20 @@ func (csp *impl) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Signer
 		return false, errors.New("Invalid digest. Cannot be empty")
 	}
 
-	return csp.verifySM2(signature, digest, opts)
+	return csp.implcsp.Verify(k, signature, digest, opts)
 }
 
 // Encrypt encrypts plaintext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *impl) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts) ([]byte, error) {
 	// TODO: Add PKCS11 support for encryption, when fabric starts requiring it
-	return csp.pubKeyEncrypt(plaintext)
+	// return csp.pubKeyEncrypt(plaintext)
+	return csp.implcsp.Encrypt(k, plaintext, opts)
 }
 
 // Decrypt decrypts ciphertext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *impl) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts) ([]byte, error) {
-	return csp.priKeyDecrypt(ciphertext)
+	// return csp.priKeyDecrypt(ciphertext)
+	return csp.implcsp.Decrypt(k, ciphertext, opts)
 }

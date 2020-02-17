@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
 	"hash"
 
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/pkg/errors"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 type impl struct {
@@ -23,7 +24,12 @@ func (csp *impl) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
 		return nil, errors.New("Invalid Opts parameter. It must not be nil")
 	}
 
-	return k, nil
+	switch opts.(type) {
+	case *bccsp.SM2KeyGenOpts:
+		return nil, errors.New("not support to gen the key in the http/server model ca")
+	default:
+		return csp.BCCSP.KeyGen(opts)
+	}
 }
 
 // KeyImport imports a key from its raw representation using opts.
@@ -37,12 +43,22 @@ func (csp *impl) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.K
 	if opts == nil {
 		return nil, errors.New("Invalid Opts parameter. It must not be nil")
 	}
-	return
+
+	k, err = csp.implcsp.KeyImport(raw, opts)
+	if err == nil {
+		return
+	}
+
+	return csp.BCCSP.KeyImport(raw, opts)
 }
 
 // GetKey returns the key this CSP associates to
 // the Subject Key Identifier ski.
 func (csp *impl) GetKey(ski []byte) (bccsp.Key, error) {
+	pk, err := sm2.ParseSm2PublicKey(ski)
+	if err == nil {
+		return &sm2PublicKey{pub: pk, ski: ski}, nil
+	}
 	return csp.BCCSP.GetKey(ski)
 }
 

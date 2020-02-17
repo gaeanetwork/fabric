@@ -1,4 +1,4 @@
-package hbca
+package server
 
 import (
 	"encoding/base64"
@@ -43,6 +43,24 @@ func (csp *HuBeiCa) getCertInfo() (*sm2.Certificate, error) {
 		return nil, errors.Wrap(err, "sm2.ParseCertificate(publicKeyBytes)")
 	}
 	return cert, nil
+}
+
+func (csp *HuBeiCa) getPublickey() (*sm2.PublicKey, error) {
+	cert, err := csp.getCertInfo()
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.ParseCertificate(publicKeyBytes)")
+	}
+
+	bytes, err := sm2.MarshalPKIXPublicKey(cert.PublicKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.MarshalPKIXPublicKey(cert.PublicKey)")
+	}
+
+	pk, err := sm2.ParseSm2PublicKey(bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.ParseSm2PublicKey(bytes)")
+	}
+	return pk, nil
 }
 
 func (csp *HuBeiCa) getCertTheme() (string, error) {

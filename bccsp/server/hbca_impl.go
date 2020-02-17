@@ -1,10 +1,11 @@
-package hbca
+package server
 
 import (
 	"hash"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
+	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/sm3"
 )
 
@@ -19,24 +20,40 @@ type HuBeiCa struct {
 
 // KeyGen generates a key using opts.
 func (csp *HuBeiCa) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
-	return nil, nil
+	return nil, errors.New("not support to gen the key in the http/server model ca")
 }
 
 // KeyDeriv derives a key from k using opts.
 // The opts argument should be appropriate for the primitive used.
 func (csp *HuBeiCa) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key, err error) {
-	return nil, nil
+	return nil, errors.New("not support to deriv the key in the http/server model ca")
 }
 
 // KeyImport imports a key from its raw representation using opts.
 // The opts argument should be appropriate for the primitive used.
 func (csp *HuBeiCa) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Key, err error) {
-	return
+	pk, err := csp.getPublickey()
+	if err != nil {
+		return nil, errors.Wrap(err, "GetSm2PublickeyByCert(sm2Cert)")
+	}
+
+	bytes, err := sm2.MarshalPKIXPublicKey(sm2Cert.PublicKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.MarshalPKIXPublicKey(cert.PublicKey)")
+	}
+
+	return &sm2PublicKey{pub: pk, ski: bytes}, nil
 }
 
 // GetKey returns the key this CSP associates to
 // the Subject Key Identifier ski.
 func (csp *HuBeiCa) GetKey(ski []byte) (k bccsp.Key, err error) {
+	pk, err := csp.getPublickey()
+	if err != nil {
+		return nil, errors.Wrap(err, "csp.getPublickey()")
+	}
+
+	k = sm2PublicKey{pub: pk, ski: ski}
 	return
 }
 

@@ -84,9 +84,9 @@ func (csp *HuBeiCa) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Sig
 	}
 
 	if ok, err := csp.validateCert(); err != nil {
-		return nil, errors.Wrap(err, "csp.validateCert()")
+		return false, errors.Wrap(err, "csp.validateCert()")
 	} else if !ok {
-		return nil, errors.New("Invalid cert")
+		return false, errors.New("Invalid cert")
 	}
 
 	return csp.verifySignedData(signature, digest)

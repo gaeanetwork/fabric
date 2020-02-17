@@ -69,6 +69,8 @@ type Opts struct {
 	// DummyKeystore *DummyKeystoreOpts `mapstructure:"dummykeystore,omitempty" json:"dummykeystore,omitempty"`
 
 	DefaultOpts string `mapstructure:"default" json:"default"`
+
+	HBCA *HBCAOpts `mapstructure:"hbca" json:"hbca"`
 }
 
 // HBCAOpts hbca opts

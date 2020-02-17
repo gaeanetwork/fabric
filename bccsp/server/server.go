@@ -26,17 +26,18 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 		return nil, errors.New("Invalid bccsp.KeyStore instance. It must be different from nil")
 	}
 
-	csp := &impl{swCSP, conf, keyStore}
+	var implcsp bccsp.BCCSP
 	switch opts.DefaultOpts {
 	case "hbca":
-		csp.implcsp = newhbca(opts)
+		implcsp = newhbca(opts.HBCA)
 	default:
 		return nil, errors.Wrapf(err, "unsupport opts of server type")
 	}
+	csp := &impl{swCSP, conf, keyStore, implcsp}
 	return csp, nil
 }
 
-func newhbca(opts *Opts) bccsp.BCCSP {
+func newhbca(opts *HBCAOpts) bccsp.BCCSP {
 	return &hbca.HuBeiCa{
 		HTTPServer: opts.HTTPServer,
 		Protocol:   opts.Protocol,

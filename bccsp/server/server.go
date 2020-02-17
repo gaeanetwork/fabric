@@ -31,14 +31,14 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 	case "hbca":
 		implcsp = newhbca(opts.HBCA)
 	default:
-		return nil, errors.Wrapf(err, "unsupport opts of server type")
+		return nil, errors.Wrapf(err, "unsupport opts of server type, default:%s", opts.DefaultOpts)
 	}
 	csp := &impl{swCSP, conf, keyStore, implcsp}
 	return csp, nil
 }
 
 func newhbca(opts *HBCAOpts) bccsp.BCCSP {
-	return &hbca.HuBeiCa{
+	return &HuBeiCa{
 		HTTPServer: opts.HTTPServer,
 		Protocol:   opts.Protocol,
 		CertID:     opts.CertID,

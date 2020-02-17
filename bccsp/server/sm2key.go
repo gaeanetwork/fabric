@@ -1,10 +1,10 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/pkg/errors"
 	"github.com/tjfoc/gmsm/sm2"
 )
 
@@ -78,4 +78,18 @@ func (k *sm2PublicKey) Private() bool {
 // This method returns an error in symmetric key schemes.
 func (k *sm2PublicKey) PublicKey() (bccsp.Key, error) {
 	return k, nil
+}
+
+// GetSm2PublickeyByCert get the public key by certificate
+func GetSm2PublickeyByCert(cert *sm2.Certificate) (*sm2.PublicKey, error) {
+	bytes, err := sm2.MarshalPKIXPublicKey(cert.PublicKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.MarshalPKIXPublicKey(cert.PublicKey)")
+	}
+
+	pk, err := sm2.ParseSm2PublicKey(bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "sm2.ParseSm2PublicKey(bytes)")
+	}
+	return pk, nil
 }

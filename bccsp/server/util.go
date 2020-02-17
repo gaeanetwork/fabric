@@ -1,4 +1,4 @@
-package hbca
+package server
 
 import (
 	"bytes"

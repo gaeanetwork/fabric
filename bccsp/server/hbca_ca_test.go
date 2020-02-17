@@ -1,10 +1,11 @@
-package hbca
+package server
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 func testImp() *HuBeiCa {
@@ -46,6 +47,13 @@ func Test_CA_GetCertInfo(t *testing.T) {
 	cert, err := implTest.getCertInfo()
 	assert.Nil(t, err)
 	assert.NotNil(t, cert)
+
+	bytes, err := sm2.MarshalPKIXPublicKey(cert.PublicKey)
+	assert.Nil(t, err)
+
+	pk, err := sm2.ParseSm2PublicKey(bytes)
+	assert.Nil(t, err)
+	assert.NotNil(t, pk)
 
 	impError := testErrorImp()
 	errorCert, err := impError.getCertInfo()

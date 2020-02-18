@@ -2,7 +2,6 @@ package server
 
 import (
 	"github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric/bccsp/server/hbca"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/pkg/errors"
 )

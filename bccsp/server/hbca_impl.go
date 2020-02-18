@@ -34,15 +34,16 @@ func (csp *HuBeiCa) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key
 func (csp *HuBeiCa) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Key, err error) {
 	pk, err := csp.getPublickey()
 	if err != nil {
-		return nil, errors.Wrap(err, "GetSm2PublickeyByCert(sm2Cert)")
+		return nil, errors.Wrap(err, "csp.getPublickey()")
 	}
 
-	bytes, err := sm2.MarshalPKIXPublicKey(sm2Cert.PublicKey)
+	bytes, err := sm2.MarshalSm2PublicKey(pk)
 	if err != nil {
-		return nil, errors.Wrap(err, "sm2.MarshalPKIXPublicKey(cert.PublicKey)")
+		return nil, errors.Wrap(err, "sm2.MarshalSm2PublicKey(pk)")
 	}
 
-	return &sm2PublicKey{pub: pk, ski: bytes}, nil
+	k = &sm2PublicKey{pub: pk, ski: bytes}
+	return
 }
 
 // GetKey returns the key this CSP associates to
@@ -53,7 +54,7 @@ func (csp *HuBeiCa) GetKey(ski []byte) (k bccsp.Key, err error) {
 		return nil, errors.Wrap(err, "csp.getPublickey()")
 	}
 
-	k = sm2PublicKey{pub: pk, ski: ski}
+	k = &sm2PublicKey{pub: pk, ski: ski}
 	return
 }
 

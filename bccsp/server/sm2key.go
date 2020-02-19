@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/hyperledger/fabric/bccsp"
@@ -16,29 +17,34 @@ type sm2PrivateKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *sm2PrivateKey) Bytes() ([]byte, error) {
+	fmt.Println("===(k *sm2PrivateKey) Bytes()===")
 	return nil, errors.New("Not supported")
 }
 
 // SKI returns the subject key identifier of this key.
 func (k *sm2PrivateKey) SKI() []byte {
+	fmt.Println("===(k *sm2PrivateKey) SKI()===")
 	return k.ski
 }
 
 // Symmetric returns true if this key is a symmetric key,
 // false if this key is asymmetric
 func (k *sm2PrivateKey) Symmetric() bool {
+	fmt.Println("===(k *sm2PrivateKey) Symmetric()===")
 	return false
 }
 
 // Private returns true if this key is a private key,
 // false otherwise.
 func (k *sm2PrivateKey) Private() bool {
+	fmt.Println("===(k *sm2PrivateKey) Private()===")
 	return true
 }
 
 // PublicKey returns the corresponding public key part of an asymmetric public/private key pair.
 // This method returns an error in symmetric key schemes.
 func (k *sm2PrivateKey) PublicKey() (bccsp.Key, error) {
+	fmt.Println("===(k *sm2PrivateKey) PublicKey()===")
 	return &k.pub, nil
 }
 
@@ -54,6 +60,7 @@ func (k *sm2PublicKey) Bytes() (raw []byte, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
 	}
+	fmt.Println("===(k *sm2PublicKey) Bytes()===:", base64.StdEncoding.EncodeToString(k.ski), "raw:", base64.StdEncoding.EncodeToString(raw))
 	return
 }
 

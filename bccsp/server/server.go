@@ -28,7 +28,10 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 	var implcsp bccsp.BCCSP
 	switch opts.DefaultOpts {
 	case "hbca":
-		implcsp = newhbca(opts.HBCA)
+		implcsp, err = newhbca(opts.HBCA)
+		if err != nil {
+			return nil, errors.Wrap(err, "newhbca(opts.HBCA)")
+		}
 	default:
 		return nil, errors.Wrapf(err, "unsupport opts of server type, default:%s", opts.DefaultOpts)
 	}
@@ -36,12 +39,34 @@ func New(opts *Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 	return csp, nil
 }
 
-func newhbca(opts *HBCAOpts) bccsp.BCCSP {
-	return &HuBeiCa{
+func newhbca(opts *HBCAOpts) (bccsp.BCCSP, error) {
+	hbca := &HuBeiCa{
 		HTTPServer: opts.HTTPServer,
 		Protocol:   opts.Protocol,
 		CertID:     opts.CertID,
 		AppKey:     opts.AppKey,
 		AppSecret:  opts.AppSecret,
 	}
+
+	var err error
+	hbca.certBase64, err = hbca.getCertBase64()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertBase64()")
+	}
+
+	hbca.validate, err = hbca.validateCert()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertBase64()")
+	}
+
+	hbca.cert, err = hbca.getCertInfo()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertInfo()")
+	}
+
+	hbca.pk, err = hbca.getPublickey()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getPublickey()")
+	}
+	return hbca, nil
 }

@@ -16,6 +16,11 @@ type HuBeiCa struct {
 	CertID     int64
 	AppKey     string
 	AppSecret  string
+
+	certBase64 string
+	validate   bool
+	pk         *sm2.PublicKey
+	cert       *sm2.Certificate
 }
 
 // KeyGen generates a key using opts.
@@ -54,8 +59,7 @@ func (csp *HuBeiCa) GetKey(ski []byte) (k bccsp.Key, err error) {
 		return nil, errors.Wrap(err, "csp.getPublickey()")
 	}
 
-	k = &sm2PublicKey{pub: pk, ski: ski}
-	return
+	return &sm2PublicKey{pub: pk, ski: ski}, nil
 }
 
 // Hash hashes messages msg using options opts.
@@ -107,7 +111,7 @@ func (csp *HuBeiCa) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Sig
 		return false, errors.New("Invalid cert")
 	}
 
-	return csp.verifySignedData(signature, digest)
+	return csp.verifySignedData(digest, signature)
 }
 
 // Encrypt encrypts plaintext using key k.

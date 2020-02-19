@@ -188,6 +188,10 @@ func (csp *HuBeiCa) validateCert() (bool, error) {
 }
 
 func (csp *HuBeiCa) singData(input []byte) ([]byte, error) {
+	if !csp.validate {
+		return nil, errors.New("ca is invalidate")
+	}
+
 	mapData := make(map[string]interface{})
 	mapData["signedCertAlias"] = fmt.Sprint(csp.CertID)
 	mapData["appKey"] = csp.AppKey
@@ -209,13 +213,13 @@ func (csp *HuBeiCa) singData(input []byte) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "base64.StdEncoding.DecodeString(res.Message)")
 	}
+	logger.Debug("===singData===input:", base64.StdEncoding.EncodeToString(input), "output:", res.Message)
 	return output, nil
 }
 
 func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
-	certBase64, err := csp.getCertBase64()
-	if err != nil {
-		return false, errors.Wrap(err, "csp.getCertBase64()")
+	if !csp.validate {
+		return false, errors.New("ca is invalidate")
 	}
 
 	mapData := make(map[string]interface{})
@@ -225,7 +229,7 @@ func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
 	mapData["inData"] = base64.StdEncoding.EncodeToString(input)
 	mapData["digestAlg"] = "SM3WITHSM2"
 	mapData["signData"] = base64.StdEncoding.EncodeToString(signBytes)
-	mapData["certB64"] = certBase64
+	mapData["certB64"] = csp.certBase64
 
 	url := fmt.Sprintf("%s://%s/hbcaDSS/VerifySignedData.do", csp.Protocol, csp.HTTPServer)
 	res, err := httpRequestJSON("POST", url, mapData)
@@ -234,7 +238,7 @@ func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
 	}
 
 	if res.Code != "0" {
-		return false, errors.New(res.Message)
+		return false, errors.New(fmt.Sprintf("input:%s, sign:%s, err:%s", base64.StdEncoding.EncodeToString(input), base64.StdEncoding.EncodeToString(signBytes), res.Code))
 	}
 
 	return true, nil

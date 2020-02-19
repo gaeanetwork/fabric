@@ -4,8 +4,13 @@ import (
 	"hash"
 
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/pkg/errors"
 	"github.com/tjfoc/gmsm/sm2"
+)
+
+var (
+	logger = flogging.MustGetLogger("bccsp.server")
 )
 
 type impl struct {
@@ -59,6 +64,12 @@ func (csp *impl) GetKey(ski []byte) (bccsp.Key, error) {
 	if err == nil {
 		return &sm2PublicKey{pub: pk, ski: ski}, nil
 	}
+
+	k, err := csp.implcsp.GetKey(ski)
+	if err == nil {
+		return k, nil
+	}
+	logger.Debug("csp.implcsp.GetKey(ski), err:", err.Error())
 	return csp.BCCSP.GetKey(ski)
 }
 

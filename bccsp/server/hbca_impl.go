@@ -86,13 +86,7 @@ func (csp *HuBeiCa) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]b
 		return nil, errors.New("Invalid digest. Cannot be empty")
 	}
 
-	if ok, err := csp.validateCert(); err != nil {
-		return nil, errors.Wrap(err, "csp.validateCert()")
-	} else if !ok {
-		return nil, errors.New("Invalid cert")
-	}
-
-	return csp.singData(digest)
+	return csp.signData(digest)
 }
 
 // Verify verifies signature against key k and digest
@@ -103,12 +97,6 @@ func (csp *HuBeiCa) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Sig
 
 	if len(digest) == 0 {
 		return false, errors.New("Invalid digest. Cannot be empty")
-	}
-
-	if ok, err := csp.validateCert(); err != nil {
-		return false, errors.Wrap(err, "csp.validateCert()")
-	} else if !ok {
-		return false, errors.New("Invalid cert")
 	}
 
 	return csp.verifySignedData(digest, signature)

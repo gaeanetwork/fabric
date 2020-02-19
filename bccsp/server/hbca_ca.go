@@ -2,19 +2,45 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/tjfoc/gmsm/sm2"
 )
 
-func (csp *HuBeiCa) getCertBase64() (string, error) {
-	mapData := make(map[string]interface{})
-	mapData["id"] = csp.CertID
-	mapData["appKey"] = csp.AppKey
-	mapData["appSecret"] = csp.AppSecret
+var (
+	cacheCertBase64 = make(map[string]string)
 
-	url := fmt.Sprintf("%s://%s/hbcaDSS/GetSignCertById.do", csp.Protocol, csp.HTTPServer)
+	getCertBase64Lock sync.Mutex
+)
+
+type hbcaSignData struct {
+	SignData  []byte
+	CertID    int64
+	DigestAlg string
+}
+
+func (csp *HuBeiCa) getCertBase64() (string, error) {
+	return getCertBase64(fmt.Sprint(csp.CertID), csp.AppKey, csp.AppSecret, csp.Protocol, csp.HTTPServer)
+}
+
+func getCertBase64(certID, appKey, appSecret, protocol, HTTPServer string) (string, error) {
+	getCertBase64Lock.Lock()
+	defer getCertBase64Lock.Unlock()
+
+	certStr, ok := cacheCertBase64[certID]
+	if ok {
+		return certStr, nil
+	}
+
+	mapData := make(map[string]interface{})
+	mapData["id"] = certID
+	mapData["appKey"] = appKey
+	mapData["appSecret"] = appSecret
+
+	url := fmt.Sprintf("%s://%s/hbcaDSS/GetSignCertById.do", protocol, HTTPServer)
 	res, err := httpRequestJSON("POST", url, mapData)
 	if err != nil {
 		return "", errors.Wrap(err, "httpRequestJSON(\"POST\", url, mapData)")
@@ -23,6 +49,8 @@ func (csp *HuBeiCa) getCertBase64() (string, error) {
 	if res.Code != "0" {
 		return "", errors.New(res.Message)
 	}
+
+	cacheCertBase64[certID] = res.Message
 
 	return res.Message, nil
 }
@@ -187,7 +215,7 @@ func (csp *HuBeiCa) validateCert() (bool, error) {
 	return false, errors.New(res.Message)
 }
 
-func (csp *HuBeiCa) singData(input []byte) ([]byte, error) {
+func (csp *HuBeiCa) signData(input []byte) ([]byte, error) {
 	if !csp.validate {
 		return nil, errors.New("ca is invalidate")
 	}
@@ -213,8 +241,23 @@ func (csp *HuBeiCa) singData(input []byte) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "base64.StdEncoding.DecodeString(res.Message)")
 	}
-	logger.Debug("===singData===input:", base64.StdEncoding.EncodeToString(input), "output:", res.Message)
-	return output, nil
+
+	sd := &hbcaSignData{
+		SignData:  output,
+		CertID:    csp.CertID,
+		DigestAlg: "SM3WITHSM2",
+	}
+
+	bytes, err := json.Marshal(sd)
+	if err != nil {
+		return nil, errors.Wrap(err, "json.Marshal(sd)")
+	}
+
+	logger.Debug("===singData===",
+		"input:", base64.StdEncoding.EncodeToString(input),
+		"signData:", res.Message,
+		"output:", base64.StdEncoding.EncodeToString(bytes))
+	return bytes, nil
 }
 
 func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
@@ -222,14 +265,29 @@ func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
 		return false, errors.New("ca is invalidate")
 	}
 
+	sd := &hbcaSignData{}
+	if err := json.Unmarshal(signBytes, sd); err != nil {
+		return false, errors.Wrap(err, "json.Unmarshal(signBytes,sd)")
+	}
+
+	logger.Debug("===singData===",
+		"input:", base64.StdEncoding.EncodeToString(input),
+		"signData:", base64.StdEncoding.EncodeToString(sd.SignData),
+		"output:", base64.StdEncoding.EncodeToString(signBytes))
+
+	certStr, err := getCertBase64(fmt.Sprint(sd.CertID), csp.AppKey, csp.AppSecret, csp.Protocol, csp.HTTPServer)
+	if err != nil {
+		return false, errors.Wrap(err, "getCertBase64(fmt.Sprint(sd.CertID),csp.AppKey,csp.AppSecret)")
+	}
+
 	mapData := make(map[string]interface{})
-	mapData["signedCertAlias"] = fmt.Sprint(csp.CertID)
+	mapData["signedCertAlias"] = fmt.Sprint(sd.CertID)
 	mapData["appKey"] = csp.AppKey
 	mapData["appSecret"] = csp.AppSecret
 	mapData["inData"] = base64.StdEncoding.EncodeToString(input)
-	mapData["digestAlg"] = "SM3WITHSM2"
-	mapData["signData"] = base64.StdEncoding.EncodeToString(signBytes)
-	mapData["certB64"] = csp.certBase64
+	mapData["digestAlg"] = sd.DigestAlg
+	mapData["signData"] = base64.StdEncoding.EncodeToString(sd.SignData)
+	mapData["certB64"] = certStr
 
 	url := fmt.Sprintf("%s://%s/hbcaDSS/VerifySignedData.do", csp.Protocol, csp.HTTPServer)
 	res, err := httpRequestJSON("POST", url, mapData)

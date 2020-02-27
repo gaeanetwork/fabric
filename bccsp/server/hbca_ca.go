@@ -253,7 +253,7 @@ func (csp *HuBeiCa) signData(input []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "json.Marshal(sd)")
 	}
 
-	logger.Debug("===singData===",
+	logger.Info("hbca invoke singData method,",
 		"input:", base64.StdEncoding.EncodeToString(input),
 		"signData:", res.Message,
 		"output:", base64.StdEncoding.EncodeToString(bytes))
@@ -270,7 +270,7 @@ func (csp *HuBeiCa) verifySignedData(input, signBytes []byte) (bool, error) {
 		return false, errors.Wrap(err, "json.Unmarshal(signBytes,sd)")
 	}
 
-	logger.Debug("===singData===",
+	logger.Info("hbca invoke verifySignedData method,",
 		"input:", base64.StdEncoding.EncodeToString(input),
 		"signData:", base64.StdEncoding.EncodeToString(sd.SignData),
 		"output:", base64.StdEncoding.EncodeToString(signBytes))

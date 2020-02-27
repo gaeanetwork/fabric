@@ -68,5 +68,7 @@ func newhbca(opts *HBCAOpts) (bccsp.BCCSP, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "hbca.getPublickey()")
 	}
+
+	logger.Info("Module hbca of the bccsp server loaded successfully")
 	return hbca, nil
 }

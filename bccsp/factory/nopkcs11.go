@@ -43,7 +43,7 @@ func InitFactories(config *FactoryOpts) error {
 		}
 
 		if config.ProviderName == "" {
-			config.ProviderName = "SW"
+			config.ProviderName = SoftwareBasedFactoryName
 		}
 
 		if config.SwOpts == nil {
@@ -94,9 +94,9 @@ func InitFactories(config *FactoryOpts) error {
 func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	var f BCCSPFactory
 	switch config.ProviderName {
-	case "SW":
+	case SoftwareBasedFactoryName:
 		f = &SWFactory{}
-	case "PLUGIN":
+	case PluginFactoryName:
 		f = &PluginFactory{}
 	case ServerBasedFactoryName:
 		f = &ServerFactory{}

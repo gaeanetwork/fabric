@@ -4,18 +4,41 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/tjfoc/gmsm/sm2"
 )
 
-func testImp() *HuBeiCa {
-	return &HuBeiCa{
+func testImp() (*HuBeiCa, error) {
+	hbca := &HuBeiCa{
 		Protocol:   "http",
 		HTTPServer: "221.232.224.75:8082",
 		CertID:     109,
 		AppKey:     "TESTAPPKEY",
 		AppSecret:  "TESTAPPSECRECT",
 	}
+
+	var err error
+	hbca.certBase64, err = hbca.getCertBase64()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertBase64()")
+	}
+
+	hbca.validate, err = hbca.validateCert()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertBase64()")
+	}
+
+	hbca.cert, err = hbca.getCertInfo()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getCertInfo()")
+	}
+
+	hbca.pk, err = hbca.getPublickey()
+	if err != nil {
+		return nil, errors.Wrap(err, "hbca.getPublickey()")
+	}
+	return hbca, nil
 }
 
 func testErrorImp() *HuBeiCa {
@@ -29,7 +52,8 @@ func testErrorImp() *HuBeiCa {
 }
 
 func Test_CA_GetCertBase64(t *testing.T) {
-	implTest := testImp()
+	implTest, err := testImp()
+	assert.Nil(t, err)
 
 	certBase64, err := implTest.getCertBase64()
 	assert.Nil(t, err)
@@ -42,7 +66,8 @@ func Test_CA_GetCertBase64(t *testing.T) {
 }
 
 func Test_CA_GetCertInfo(t *testing.T) {
-	implTest := testImp()
+	implTest, err := testImp()
+	assert.Nil(t, err)
 
 	cert, err := implTest.getCertInfo()
 	assert.Nil(t, err)
@@ -62,7 +87,8 @@ func Test_CA_GetCertInfo(t *testing.T) {
 }
 
 func Test_CA_ValidateCert(t *testing.T) {
-	implTest := testImp()
+	implTest, err := testImp()
+	assert.Nil(t, err)
 
 	ok, err := implTest.validateCert()
 	assert.Nil(t, err)
@@ -75,10 +101,11 @@ func Test_CA_ValidateCert(t *testing.T) {
 }
 
 func Test_CA_SignAndVerifyData(t *testing.T) {
-	implTest := testImp()
+	implTest, err := testImp()
+	assert.Nil(t, err)
 
 	inData := []byte("123456")
-	outputBytes, err := implTest.singData(inData)
+	outputBytes, err := implTest.signData(inData)
 	assert.Nil(t, err)
 	assert.NotNil(t, outputBytes)
 
@@ -98,7 +125,8 @@ func Test_CA_SignAndVerifyData(t *testing.T) {
 }
 
 func Test_CA_pubKeyEncryptAndPriKeyDecrypt(t *testing.T) {
-	implTest := testImp()
+	implTest, err := testImp()
+	assert.Nil(t, err)
 
 	inData := []byte("123456")
 	ciphertext, err := implTest.pubKeyEncrypt(inData)

@@ -194,3 +194,29 @@ func TestX509PublicKeyImportOptsKeyImporter(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Certificate's public key type not recognized. Supported keys: [ECDSA]")
 }
+
+func TestSM4ImportKeyOptsKeyImporter(t *testing.T) {
+	t.Parallel()
+
+	ki := sm4ImportKeyOptsKeyImporter{}
+
+	_, err := ki.KeyImport("Hello World", &mocks2.KeyImportOpts{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected byte array")
+
+	_, err = ki.KeyImport(nil, &mocks2.KeyImportOpts{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected byte array")
+
+	_, err = ki.KeyImport([]byte(nil), &mocks2.KeyImportOpts{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Invalid raw material. It must not be nil")
+
+	_, err = ki.KeyImport([]byte{0}, &mocks2.KeyImportOpts{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Invalid Key Length [")
+
+	key, err := ki.KeyImport([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, &mocks2.KeyImportOpts{})
+	assert.Nil(t, err)
+	assert.NotNil(t, key)
+}

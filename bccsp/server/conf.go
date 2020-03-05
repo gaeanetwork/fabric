@@ -1,13 +1,6 @@
-/*
-Copyright IBM Corp. All Rights Reserved.
-
-SPDX-License-Identifier: Apache-2.0
-*/
-
-package sw
+package server
 
 import (
-	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
@@ -18,10 +11,7 @@ import (
 )
 
 type config struct {
-	ellipticCurve elliptic.Curve
-	hashFunction  func() hash.Hash
-	aesBitLength  int
-	sm4BitLength  int
+	hashFunction func() hash.Hash
 }
 
 func (conf *config) setSecurityLevel(securityLevel int, hashFamily string) (err error) {
@@ -41,13 +31,9 @@ func (conf *config) setSecurityLevel(securityLevel int, hashFamily string) (err 
 func (conf *config) setSecurityLevelSHA2(level int) (err error) {
 	switch level {
 	case 256:
-		conf.ellipticCurve = elliptic.P256()
 		conf.hashFunction = sha256.New
-		conf.aesBitLength = 32
 	case 384:
-		conf.ellipticCurve = elliptic.P384()
 		conf.hashFunction = sha512.New384
-		conf.aesBitLength = 32
 	default:
 		err = fmt.Errorf("Security level not supported [%d]", level)
 	}
@@ -57,13 +43,9 @@ func (conf *config) setSecurityLevelSHA2(level int) (err error) {
 func (conf *config) setSecurityLevelSHA3(level int) (err error) {
 	switch level {
 	case 256:
-		conf.ellipticCurve = elliptic.P256()
 		conf.hashFunction = sha3.New256
-		conf.aesBitLength = 32
 	case 384:
-		conf.ellipticCurve = elliptic.P384()
 		conf.hashFunction = sha3.New384
-		conf.aesBitLength = 32
 	default:
 		err = fmt.Errorf("Security level not supported [%d]", level)
 	}
@@ -72,6 +54,31 @@ func (conf *config) setSecurityLevelSHA3(level int) (err error) {
 
 func (conf *config) setSecurityLevelSM3() (err error) {
 	conf.hashFunction = sm3.New
-	conf.sm4BitLength = 16
 	return
+}
+
+// Opts contains options for the P11Factory
+type Opts struct {
+	// Default algorithms when not specified (Deprecated?)
+	SecLevel   int    `mapstructure:"security" json:"security"`
+	HashFamily string `mapstructure:"hash" json:"hash"`
+
+	// Keystore options
+	// Ephemeral bool `mapstructure:"tempkeys,omitempty" json:"tempkeys,omitempty"`
+	// FileKeystore  *FileKeystoreOpts  `mapstructure:"filekeystore,omitempty" json:"filekeystore,omitempty"`
+	// DummyKeystore *DummyKeystoreOpts `mapstructure:"dummykeystore,omitempty" json:"dummykeystore,omitempty"`
+
+	DefaultOpts string `mapstructure:"default" json:"default"`
+
+	HBCA *HBCAOpts `mapstructure:"hbca" json:"hbca"`
+}
+
+// HBCAOpts hbca opts
+type HBCAOpts struct {
+	// PKCS11 options
+	HTTPServer string `mapstructure:"httpserver" json:"httpserver"`
+	Protocol   string `mapstructure:"protocol" json:"protocol"`
+	CertID     int64  `mapstructure:"certID" json:"certID"`
+	AppKey     string `mapstructure:"appKey" json:"appKey"`
+	AppSecret  string `mapstructure:"appSecret" json:"appSecret"`
 }

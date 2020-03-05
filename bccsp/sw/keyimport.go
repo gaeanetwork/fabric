@@ -133,3 +133,22 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 		return nil, errors.New("Certificate's public key type not recognized. Supported keys: [ECDSA]")
 	}
 }
+
+type sm4ImportKeyOptsKeyImporter struct{}
+
+func (*sm4ImportKeyOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
+	sm4Raw, ok := raw.([]byte)
+	if !ok {
+		return nil, errors.New("Invalid raw material. Expected byte array")
+	}
+
+	if sm4Raw == nil {
+		return nil, errors.New("Invalid raw material. It must not be nil")
+	}
+
+	if len(sm4Raw) != 16 {
+		return nil, fmt.Errorf("Invalid Key Length [%d]. Must be 32 bytes", len(sm4Raw))
+	}
+
+	return &sm4PrivateKey{utils.Clone(sm4Raw), false}, nil
+}

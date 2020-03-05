@@ -84,3 +84,27 @@ func TestAESKeyGeneratorInvalidInputs(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Len must be larger than 0")
 }
+
+func TestSM4KeyGenerator(t *testing.T) {
+	t.Parallel()
+
+	kg := &sm4KeyGenerator{length: 16}
+
+	k, err := kg.KeyGen(nil)
+	assert.NoError(t, err)
+
+	sm4K, ok := k.(*sm4PrivateKey)
+	assert.True(t, ok)
+	assert.NotNil(t, sm4K.privKey)
+	assert.Equal(t, len(sm4K.privKey), 16)
+}
+
+func TestSM4KeyGeneratorInvalidInputs(t *testing.T) {
+	t.Parallel()
+
+	kg := &sm4KeyGenerator{length: -1}
+
+	_, err := kg.KeyGen(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Len must be larger than 0")
+}

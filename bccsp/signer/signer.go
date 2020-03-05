@@ -13,6 +13,7 @@ import (
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/pkg/errors"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 // bccspCryptoSigner is the BCCSP-based implementation of a crypto.Signer
@@ -48,6 +49,11 @@ func New(csp bccsp.BCCSP, key bccsp.Key) (crypto.Signer, error) {
 	}
 
 	pk, err := utils.DERToPublicKey(raw)
+	if err == nil {
+		return &bccspCryptoSigner{csp, key, pk}, nil
+	}
+
+	pk, err = sm2.ParsePKIXPublicKey(raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed marshalling der to public key")
 	}

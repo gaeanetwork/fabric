@@ -206,7 +206,6 @@ func Test_CA_Apply(t *testing.T) {
 		PlatformName: "测试平台系统",
 		CertDn:       "测试DN1",
 	}
-	certRevoke, err := implTest.CertRevoke(certRevokeInput)
+	err = implTest.CertRevoke(certRevokeInput)
 	assert.Nil(t, err)
-	assert.NotNil(t, certRevoke)
 }

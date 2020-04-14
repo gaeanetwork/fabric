@@ -120,7 +120,10 @@ func (csp *HuBeiCa) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Sig
 		return false, errors.New("Invalid digest. Cannot be empty")
 	}
 
-	return csp.VerifySignedData(digest, signature)
+	if err := csp.VerifySignedData(digest, signature); err != nil {
+		return false, errors.Wrap(err, "csp.VerifySignedData(digest, signature)")
+	}
+	return true, nil
 }
 
 // Encrypt encrypts plaintext using key k.

@@ -90,6 +90,10 @@ func (csp *HuBeiCa) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]b
 		return nil, errors.New("Invalid digest. Cannot be empty")
 	}
 
+	if len(csp.opt.CertID) > 0 {
+		return csp.SignData(digest, csp.opt.CertID)
+	}
+
 	key, err := k.PublicKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "k.PublicKey()")
@@ -102,8 +106,8 @@ func (csp *HuBeiCa) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]b
 	}
 
 	certID := GenerateCertID(bytes)
-	logger.Info("certID for sign:", certID)
-	return csp.SignData(certID, digest)
+	logger.Debug("certID for sign:", certID)
+	return csp.SignData(digest, certID)
 }
 
 // Verify verifies signature against key k and digest
@@ -122,12 +126,47 @@ func (csp *HuBeiCa) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.Sig
 // Encrypt encrypts plaintext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *HuBeiCa) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts) ([]byte, error) {
-	// TODO: Add PKCS11 support for encryption, when fabric starts requiring it
-	return csp.PubKeyEncrypt(plaintext)
+	if len(csp.opt.CertID) > 0 {
+		return csp.PubKeyEncrypt(plaintext, csp.opt.CertID)
+	}
+
+	key, err := k.PublicKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "k.PublicKey()")
+	}
+
+	// TODO: use this certID to sign
+	bytes, err := key.Bytes()
+	if err != nil {
+		return nil, errors.Wrap(err, "key.Bytes()")
+	}
+
+	certID := GenerateCertID(bytes)
+	logger.Debug("certID for sign:", certID)
+
+	return csp.PubKeyEncrypt(plaintext, certID)
 }
 
 // Decrypt decrypts ciphertext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *HuBeiCa) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts) ([]byte, error) {
-	return csp.PriKeyDecrypt(ciphertext)
+	if len(csp.opt.CertID) > 0 {
+		return csp.PriKeyDecrypt(ciphertext, csp.opt.CertID)
+	}
+
+	key, err := k.PublicKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "k.PublicKey()")
+	}
+
+	// TODO: use this certID to sign
+	bytes, err := key.Bytes()
+	if err != nil {
+		return nil, errors.Wrap(err, "key.Bytes()")
+	}
+
+	certID := GenerateCertID(bytes)
+	logger.Debug("certID for sign:", certID)
+
+	return csp.PriKeyDecrypt(ciphertext, certID)
 }

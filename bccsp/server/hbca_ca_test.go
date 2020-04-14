@@ -84,19 +84,16 @@ func Test_CA_SignAndVerifyData(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, outputBytes)
 
-	ok, err := implTest.VerifySignedData(inData, outputBytes)
+	err = implTest.VerifySignedData(inData, outputBytes)
 	assert.Nil(t, err)
-	assert.True(t, ok)
 
 	errInData := []byte("1234567")
-	ok, err = implTest.VerifySignedData(errInData, outputBytes)
+	err = implTest.VerifySignedData(errInData, outputBytes)
 	assert.NotNil(t, err)
-	assert.False(t, ok)
 
 	errSingData := []byte("1234567")
-	ok, err = implTest.VerifySignedData(inData, errSingData)
+	err = implTest.VerifySignedData(inData, errSingData)
 	assert.NotNil(t, err)
-	assert.False(t, ok)
 }
 
 func Test_CA_pubKeyEncryptAndPriKeyDecrypt(t *testing.T) {
@@ -190,6 +187,9 @@ func Test_CA_Apply(t *testing.T) {
 	err = implTest.ImportSignCert(importSignCert)
 	assert.Nil(t, err)
 
+	p10, err = implTest.CreateP10ForUpdate(certID)
+	assert.Nil(t, err)
+
 	extendCertInput := &ExtendCertInput{
 		CaData: &RefCode{
 			RefCode: responseApply.Data.RefCode,
@@ -208,6 +208,29 @@ func Test_CA_Apply(t *testing.T) {
 	resExtend, err := implTest.ExtendCertValid(extendCertInput)
 	assert.Nil(t, err)
 	assert.NotNil(t, resExtend)
+
+	importEncCertForUpdate := &ImportEncCert{
+		RootID:          "SM2Test",
+		SignCertID:      certID,
+		EncCertID:       certID,
+		EncCertB64:      responseApply.Data.EncryptCert,
+		DoubleEncPriKey: responseApply.Data.DoubleEncryptedPrivateKey,
+		CertType:        "SM2",
+	}
+	err = implTest.ImportEncCertForUpdate(importEncCertForUpdate)
+	assert.Nil(t, err)
+
+	importSignCertForUpdate := &ImportSignCert{
+		CertID:       certID,
+		CertName:     certID,
+		SignCertB64:  resExtend.Data.SignatureCert,
+		CertType:     "x509",
+		RootCertName: "SM2Test",
+		ImportType:   "add",
+		Password:     "",
+	}
+	err = implTest.ImportSignCertForUpdate(importSignCertForUpdate)
+	assert.Nil(t, err)
 
 	certRevokeInput := &CertRevokeInput{
 		CaData: &RefCode{

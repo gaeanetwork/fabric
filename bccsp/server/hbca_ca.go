@@ -58,7 +58,7 @@ func HandlerWSDLResponse(response string) (string, error) {
 	}
 
 	if res.Code != "0" {
-		return "", errors.New(res.Message)
+		return "", errors.New(fmt.Sprintf("%s:%s", res.Message, res.Data))
 	}
 
 	return res.Data, nil
@@ -243,15 +243,15 @@ func (csp *HuBeiCa) SignData(input []byte, certIDs ...string) ([]byte, error) {
 }
 
 // VerifySignedData verify sign data
-func (csp *HuBeiCa) VerifySignedData(input, signBytes []byte) (bool, error) {
+func (csp *HuBeiCa) VerifySignedData(input, signBytes []byte) error {
 	sd := &hbcaSignData{}
 	if err := json.Unmarshal(signBytes, sd); err != nil {
-		return false, errors.Wrap(err, "json.Unmarshal(signBytes,sd)")
+		return errors.Wrap(err, "json.Unmarshal(signBytes,sd)")
 	}
 
 	certBase64, err := csp.GetSignCert(sd.CertID)
 	if err != nil {
-		return false, errors.Wrap(err, "csp.getCertBase64()")
+		return errors.Wrap(err, "csp.getCertBase64()")
 	}
 
 	s := NewHbcaWSDL(csp.opt.WSDLServer, csp.opt.Namespace, csp.opt.ContentType)
@@ -268,14 +268,14 @@ func (csp *HuBeiCa) VerifySignedData(input, signBytes []byte) (bool, error) {
 
 	res, err := s.VerifySignedDataP1(data)
 	if err != nil {
-		return false, errors.Wrap(err, "s.VerifySignedDataP1(data)")
+		return errors.Wrap(err, "s.VerifySignedDataP1(data)")
 	}
 
 	if _, err = HandlerWSDLResponse(*res.Return); err != nil {
-		return false, errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")
+		return errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")
 	}
 
-	return true, nil
+	return nil
 }
 
 // PubKeyEncrypt public key encrypt, if certIDs is empty, use the csp.opt.CertID, otherwise use the certIDs[0] as certID
@@ -431,6 +431,92 @@ func (csp *HuBeiCa) ImportSignCert(importSignCert *ImportSignCert) error {
 	}
 
 	logger.Debugf("import sign cert response, certID:%s, response:%s", importSignCert.CertID, *res.Return)
+
+	if _, err = HandlerWSDLResponse(*res.Return); err != nil {
+		return errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")
+	}
+
+	return nil
+}
+
+// CreateP10ForUpdate create p10
+func (csp *HuBeiCa) CreateP10ForUpdate(certIDs ...string) (string, error) {
+	certID := getCertID(csp, certIDs...)
+
+	s := NewHbcaWSDL(csp.opt.WSDLServer, csp.opt.Namespace, csp.opt.ContentType)
+
+	data := &wsdl.CreateP10ForUpdate{
+		AppKey:    &csp.opt.AppKey,
+		AppSecret: &csp.opt.AppSecret,
+		CertId:    &certID,
+	}
+
+	res, err := s.CreateP10ForUpdate(data)
+	if err != nil {
+		return "", errors.Wrap(err, "s.ImportSignCert(data)")
+	}
+
+	logger.Debugf("create p10 for update, certID:%s, response:%s", certID, *res.Return)
+
+	response, err := HandlerWSDLResponse(*res.Return)
+	if err != nil {
+		return "", errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")
+	}
+
+	return response, nil
+}
+
+// ImportEncCertForUpdate import enc cert
+func (csp *HuBeiCa) ImportEncCertForUpdate(importEncCert *ImportEncCert) error {
+	s := NewHbcaWSDL(csp.opt.WSDLServer, csp.opt.Namespace, csp.opt.ContentType)
+
+	data := &wsdl.ImportEncCertForUpdate{
+		AppKey:          &csp.opt.AppKey,
+		AppSecret:       &csp.opt.AppSecret,
+		RootId:          &importEncCert.RootID,
+		SignCertId:      &importEncCert.SignCertID,
+		EncCertId:       &importEncCert.EncCertID,
+		EncCertB64:      &importEncCert.EncCertB64,
+		DoubleEncPriKey: &importEncCert.DoubleEncPriKey,
+		CertType:        &importEncCert.CertType,
+	}
+
+	res, err := s.ImportEncCertForUpdate(data)
+	if err != nil {
+		return errors.Wrap(err, "s.ImportEncCert(data)")
+	}
+
+	logger.Debugf("import encert for update response, certID:%s, response:%s", importEncCert.EncCertID, *res.Return)
+
+	if _, err = HandlerWSDLResponse(*res.Return); err != nil {
+		return errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")
+	}
+
+	return nil
+}
+
+// ImportSignCertForUpdate import sign cert
+func (csp *HuBeiCa) ImportSignCertForUpdate(importSignCert *ImportSignCert) error {
+	s := NewHbcaWSDL(csp.opt.WSDLServer, csp.opt.Namespace, csp.opt.ContentType)
+
+	data := &wsdl.ImportSignCertForUpdate{
+		AppKey:       &csp.opt.AppKey,
+		AppSecret:    &csp.opt.AppSecret,
+		CertId:       &importSignCert.CertID,
+		CertName:     &importSignCert.CertName,
+		SignCertB64:  &importSignCert.SignCertB64,
+		CertType:     &importSignCert.CertType,
+		RootCertName: &importSignCert.RootCertName,
+		ImportType:   &importSignCert.ImportType,
+		Password:     &importSignCert.Password,
+	}
+
+	res, err := s.ImportSignCertForUpdate(data)
+	if err != nil {
+		return errors.Wrap(err, "s.ImportSignCert(data)")
+	}
+
+	logger.Debugf("import sign cert for update response, certID:%s, response:%s", importSignCert.CertID, *res.Return)
 
 	if _, err = HandlerWSDLResponse(*res.Return); err != nil {
 		return errors.Wrap(err, "HandlerWSDLResponse(*res.Return)")

@@ -82,4 +82,18 @@ type HBCACert interface {
 
 	// ImportSignCert import cert
 	ImportSignCert(importSignCert *ImportSignCert) error
+
+	SignData(input []byte, certIDs ...string) ([]byte, error)
+
+	VerifySignedData(input, signBytes []byte) error
+
+	PubKeyEncrypt(input []byte, certIDs ...string) ([]byte, error)
+
+	PriKeyDecrypt(input []byte, certIDs ...string) ([]byte, error)
+
+	CreateP10ForUpdate(certIDs ...string) (string, error)
+
+	ImportEncCertForUpdate(importEncCert *ImportEncCert) error
+
+	ImportSignCertForUpdate(importSignCert *ImportSignCert) error
 }

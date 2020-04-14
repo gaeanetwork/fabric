@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,11 +15,16 @@ func testImp() (*HuBeiCa, error) {
 	hbca := &HuBeiCa{
 		opt: &HBCAOpts{
 			WSDLServer: "http://221.232.224.75:8082/hbcaDSS/hbcaService?wsdl",
-			CertID:     "109",
+			CertID:     "38626334633263642d636432392d343038632d383265362d356466616132646461653961",
 			AppKey:     "TESTAPPKEY",
 			AppSecret:  "TESTAPPSECRECT",
 		},
 		CertServer: "http://221.232.224.75:58140",
+		CertAction: &CertAction{
+			CertApplyAction:       "/hbcaLCA/api/v3/certApply.do",
+			CertRevokeAction:      "/hbcaLCA/api/v3/certRevoke.do",
+			ExtendCertValidAction: "/hbcaLCA/api/v3/extendCertValid.do",
+		},
 	}
 	return hbca, nil
 }
@@ -38,12 +44,12 @@ func Test_CA_GetCertBase64(t *testing.T) {
 	implTest, err := testImp()
 	assert.Nil(t, err)
 
-	certBase64, err := implTest.GetCertBase64("109")
+	certBase64, err := implTest.GetCertBase64()
 	assert.Nil(t, err)
 	assert.NotEmpty(t, certBase64)
 
 	impError := testErrorImp()
-	ErrorPublicKeyBytes, err := impError.GetCertBase64("109")
+	ErrorPublicKeyBytes, err := impError.GetCertBase64()
 	assert.Error(t, err)
 	assert.Empty(t, ErrorPublicKeyBytes)
 }
@@ -52,7 +58,7 @@ func Test_CA_GetCertInfo(t *testing.T) {
 	implTest, err := testImp()
 	assert.Nil(t, err)
 
-	cert, err := implTest.GetCertInfo("109")
+	cert, err := implTest.GetCertInfo()
 	assert.Nil(t, err)
 	assert.NotNil(t, cert)
 
@@ -64,7 +70,7 @@ func Test_CA_GetCertInfo(t *testing.T) {
 	assert.NotNil(t, pk)
 
 	impError := testErrorImp()
-	errorCert, err := impError.GetCertInfo("109")
+	errorCert, err := impError.GetCertInfo()
 	assert.Error(t, err)
 	assert.Nil(t, errorCert)
 }
@@ -74,7 +80,7 @@ func Test_CA_SignAndVerifyData(t *testing.T) {
 	assert.Nil(t, err)
 
 	inData := []byte("123456")
-	outputBytes, err := implTest.SignData("", inData)
+	outputBytes, err := implTest.SignData(inData)
 	assert.Nil(t, err)
 	assert.NotNil(t, outputBytes)
 
@@ -115,12 +121,12 @@ func Test_CA_pubKeyEncryptAndPriKeyDecrypt(t *testing.T) {
 func Test_CA_Apply(t *testing.T) {
 	implTest, err := testImp()
 	assert.Nil(t, err)
-
+	certID := hex.EncodeToString([]byte(uuid.New().String()))
 	// 1、apply p10
 	// ApplyDn format "CN=Hbca_test333_4,C=CN"
 	createP10Input := &CreateP10Input{
-		CertID:     hex.EncodeToString([]byte(uuid.New().String())),
-		CertName:   hex.EncodeToString([]byte(uuid.New().String())),
+		CertID:     certID,
+		CertName:   certID,
 		ApplyDn:    "CN=Hbca_test333_4,C=CN",
 		EncryptAlg: "SM2",
 		KeyLength:  "256",
@@ -132,7 +138,11 @@ func Test_CA_Apply(t *testing.T) {
 	assert.NotEmpty(t, res)
 
 	// time.Sleep(1 * time.Minute)
+	//
 	p10 := res
+
+	fmt.Println(certID)
+
 	// 2、apply ca
 	input := &HBCAApplyInput{
 		CreditCode:           uuid.New().String()[0:8],
@@ -157,26 +167,28 @@ func Test_CA_Apply(t *testing.T) {
 	responseApply, err := implTest.CertApply(input)
 	assert.Nil(t, err)
 
-	// importEncCert := &ImportEncCert{
-	// 	RootID:          "SM2Test",
-	// 	SignCertID:      certID,
-	// 	EncCertID:       certID,
-	// 	EncCertB64:      responseApply.Data.EncryptCert,
-	// 	DoubleEncPriKey: responseApply.Data.DoubleEncryptedPrivateKey,
-	// 	CertType:        "SM2",
-	// }
-	// responseImportEncCert, err := implTest.ImportEncCert(importEncCert)
-	// assert.Nil(t, err)
-	// fmt.Println(responseImportEncCert)
+	importEncCert := &ImportEncCert{
+		RootID:          "SM2Test",
+		SignCertID:      certID,
+		EncCertID:       certID,
+		EncCertB64:      responseApply.Data.EncryptCert,
+		DoubleEncPriKey: responseApply.Data.DoubleEncryptedPrivateKey,
+		CertType:        "SM2",
+	}
+	err = implTest.ImportEncCert(importEncCert)
+	assert.Nil(t, err)
 
-	// signCertB64 := ""
-	// certType = ""
-	// rootCertName := ""
-	// importType := ""
-	// password := ""
-	// responseImportSignCert, err := implTest.ImportSignCert(certID, certName, signCertB64, certType, rootCertName, importType, password)
-	// assert.Nil(t, err)
-	// fmt.Println(responseImportSignCert)
+	importSignCert := &ImportSignCert{
+		CertID:       certID,
+		CertName:     certID,
+		SignCertB64:  responseApply.Data.SignatureCert,
+		CertType:     "x509",
+		RootCertName: "SM2Test",
+		ImportType:   "add",
+		Password:     "",
+	}
+	err = implTest.ImportSignCert(importSignCert)
+	assert.Nil(t, err)
 
 	extendCertInput := &ExtendCertInput{
 		CaData: &RefCode{
@@ -206,6 +218,7 @@ func Test_CA_Apply(t *testing.T) {
 		PlatformName: "测试平台系统",
 		CertDn:       "测试DN1",
 	}
+
 	err = implTest.CertRevoke(certRevokeInput)
 	assert.Nil(t, err)
 }

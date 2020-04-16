@@ -213,8 +213,8 @@ func Test_CA_Apply(t *testing.T) {
 		RootID:          "SM2Test",
 		SignCertID:      certID,
 		EncCertID:       certID,
-		EncCertB64:      responseApply.Data.EncryptCert,
-		DoubleEncPriKey: responseApply.Data.DoubleEncryptedPrivateKey,
+		EncCertB64:      resExtend.Data.EncryptCert,
+		DoubleEncPriKey: resExtend.Data.DoubleEncryptedPrivateKey,
 		CertType:        "SM2",
 	}
 	err = implTest.ImportEncCertForUpdate(importEncCertForUpdate)

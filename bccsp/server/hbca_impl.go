@@ -1,12 +1,10 @@
 package server
 
 import (
-	"encoding/hex"
 	"hash"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
-	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/sm3"
 )
 
@@ -38,32 +36,15 @@ func (csp *HuBeiCa) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key
 // KeyImport imports a key from its raw representation using opts.
 // The opts argument should be appropriate for the primitive used.
 func (csp *HuBeiCa) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Key, err error) {
-	pk, err := csp.GetPublickey(csp.opt.CertID)
-	if err != nil {
-		return nil, errors.Wrap(err, "csp.getPublickey()")
-	}
-
-	bytes, err := sm2.MarshalSm2PublicKey(pk)
-	if err != nil {
-		return nil, errors.Wrap(err, "sm2.MarshalSm2PublicKey(pk)")
-	}
-
-	k = &sm2PublicKey{pub: pk, ski: bytes}
+	// use sw keyImport
 	return
 }
 
 // GetKey returns the key this CSP associates to
 // the Subject Key Identifier ski.
 func (csp *HuBeiCa) GetKey(ski []byte) (k bccsp.Key, err error) {
-	certID := hex.EncodeToString(ski)
-	logger.Info("GetKey[hex.EncodeToString(ski)]:", certID)
-
-	pk, err := csp.GetPublickey(csp.opt.CertID)
-	if err != nil {
-		return nil, errors.Wrap(err, "csp.getPublickey()")
-	}
-
-	return &sm2PublicKey{pub: pk, ski: ski}, nil
+	// use sw GetKey
+	return
 }
 
 // Hash hashes messages msg using options opts.
@@ -138,7 +119,6 @@ func (csp *HuBeiCa) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterO
 		return nil, errors.Wrap(err, "k.PublicKey()")
 	}
 
-	// TODO: use this certID to sign
 	bytes, err := key.Bytes()
 	if err != nil {
 		return nil, errors.Wrap(err, "key.Bytes()")

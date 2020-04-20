@@ -14,6 +14,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// ErrorKeyNotFound key not found
+	ErrorKeyNotFound = errors.New("key is nil")
+
+	// ErrorSKINotFound ski is nil
+	ErrorSKINotFound = errors.New("ski is nil or empty")
+
+	// ErrorAlreadyExists already exist
+	ErrorAlreadyExists = errors.New("already exists in the keystore")
+)
+
 // NewInMemoryKeyStore instantiates an ephemeral in-memory keystore
 func NewInMemoryKeyStore() bccsp.KeyStore {
 	eks := &inmemoryKeyStore{}
@@ -35,7 +46,7 @@ func (ks *inmemoryKeyStore) ReadOnly() bool {
 // GetKey returns a key object whose SKI is the one passed.
 func (ks *inmemoryKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 	if len(ski) == 0 {
-		return nil, errors.New("ski is nil or empty")
+		return nil, ErrorSKINotFound
 	}
 
 	skiStr := hex.EncodeToString(ski)
@@ -51,7 +62,7 @@ func (ks *inmemoryKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 // StoreKey stores the key k in this KeyStore.
 func (ks *inmemoryKeyStore) StoreKey(k bccsp.Key) error {
 	if k == nil {
-		return errors.New("key is nil")
+		return ErrorKeyNotFound
 	}
 
 	ski := hex.EncodeToString(k.SKI())
@@ -60,7 +71,7 @@ func (ks *inmemoryKeyStore) StoreKey(k bccsp.Key) error {
 	defer ks.m.Unlock()
 
 	if _, found := ks.keys[ski]; found {
-		return errors.Errorf("ski %x already exists in the keystore", k.SKI())
+		return errors.Wrapf(ErrorAlreadyExists, "ski %x", k.SKI)
 	}
 	ks.keys[ski] = k
 

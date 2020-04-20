@@ -138,7 +138,10 @@ func SetupBCCSPKeystoreConfig(bccspConfig *factory.FactoryOpts, keystoreDir stri
 		if bccspConfig.SwOpts == nil {
 			bccspConfig.SwOpts = factory.GetDefaultOpts().SwOpts
 		}
+	}
 
+	// when ProviderName is not sw, but have the sw config, will be panic
+	if bccspConfig.SwOpts != nil {
 		// Only override the KeyStorePath if it was left empty
 		if bccspConfig.SwOpts.FileKeystore == nil ||
 			bccspConfig.SwOpts.FileKeystore.KeyStorePath == "" {

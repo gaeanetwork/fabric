@@ -4,6 +4,7 @@ import (
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/pkg/errors"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 // New new a server bccsp
@@ -103,4 +104,7 @@ type HBCACert interface {
 
 	// ImportSignCertForUpdate import sign cert
 	ImportSignCertForUpdate(importSignCert *ImportSignCert) error
+
+	// GetCertInfo get cert info, if certIDs is empty, use the csp.opt.CertID, otherwise use the certIDs[0] as certID
+	GetCertInfo(certIDs ...string) (*sm2.Certificate, error)
 }

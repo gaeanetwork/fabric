@@ -8,6 +8,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"sync"
@@ -336,7 +337,25 @@ func startThread(chain *chainImpl) {
 
 	logger.Infof("[channel: %s] Start phase completed successfully", chain.channel.topic())
 
+	go chain.printBlockInfo()
+
 	chain.processMessagesToBlocks() // Keep up to date with the channel
+}
+
+func (chain *chainImpl) printBlockInfo() {
+	currentHeight := chain.Height()
+	for i := currentHeight - 1; i > 0; i-- {
+		block := chain.Block(i)
+		if block != nil {
+			logger.Debugf("[channel: %s] the block [number:%d] exists, PreviousHash:%s, hash:%s",
+				chain.ChainID(),
+				i,
+				base64.StdEncoding.EncodeToString(block.Header.PreviousHash),
+				base64.StdEncoding.EncodeToString(block.Header.Hash()))
+			continue
+		}
+		logger.Debugf("[channel: %s] the block [number:%s] doesn't exist", i)
+	}
 }
 
 // processMessagesToBlocks drains the Kafka consumer for the given channel, and

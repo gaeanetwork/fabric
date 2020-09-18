@@ -342,19 +342,33 @@ func startThread(chain *chainImpl) {
 	chain.processMessagesToBlocks() // Keep up to date with the channel
 }
 
+// printBlockInfo print the started and last 100 blocks
 func (chain *chainImpl) printBlockInfo() {
 	currentHeight := chain.Height()
-	for i := currentHeight - 1; i > 0; i-- {
+	for i := currentHeight; i > currentHeight-100; i-- {
 		block := chain.Block(i)
 		if block != nil {
-			logger.Debugf("[channel: %s] the block [number:%d] exists, PreviousHash:%s, hash:%s",
+			logger.Infof("[channel: %s] the block [number:%d] exists, PreviousHash:%s, hash:%s",
 				chain.ChainID(),
 				i,
 				base64.StdEncoding.EncodeToString(block.Header.PreviousHash),
 				base64.StdEncoding.EncodeToString(block.Header.Hash()))
 			continue
 		}
-		logger.Debugf("[channel: %s] the block [number:%s] doesn't exist", i)
+		logger.Infof("[channel: %s] the block [number:%s] doesn't exist", chain.ChainID(), i)
+	}
+
+	for i := uint64(1); i <= 100; i++ {
+		block := chain.Block(i)
+		if block != nil {
+			logger.Infof("[channel: %s] the block [number:%d] exists, PreviousHash:%s, hash:%s",
+				chain.ChainID(),
+				i,
+				base64.StdEncoding.EncodeToString(block.Header.PreviousHash),
+				base64.StdEncoding.EncodeToString(block.Header.Hash()))
+			continue
+		}
+		logger.Infof("[channel: %s] the block [number:%s] doesn't exist", chain.ChainID(), i)
 	}
 }
 

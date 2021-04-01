@@ -24,12 +24,14 @@ require (
 	github.com/eapache/go-resiliency v1.2.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
+	github.com/fiorix/wsdl2go v1.4.7
 	github.com/frankban/quicktest v1.9.0 // indirect
 	github.com/fsouza/go-dockerclient v1.4.1
 	github.com/go-kit/kit v0.8.0
-	github.com/golang/protobuf v1.3.3
+	github.com/golang/protobuf v1.4.2
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/go-cmp v0.5.0 // indirect
+	github.com/google/uuid v1.0.0
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0
@@ -64,11 +66,11 @@ require (
 	github.com/sykesm/zap-logfmt v0.0.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	github.com/tedsuo/ifrit v0.0.0-20180802180643-bea94bb476cc
+	github.com/tjfoc/gmsm v1.4.0
 	github.com/willf/bitset v1.1.10
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20181228115726-23731bf9ba55
 	go.uber.org/zap v1.14.1
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/sys v0.0.0-20200819091447-39769834ee22 // indirect
+	golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee
 	golang.org/x/tools v0.0.0-20200131233409-575de47986ce
 	google.golang.org/grpc v1.31.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6

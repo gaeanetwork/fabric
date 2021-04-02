@@ -10,16 +10,23 @@ import (
 	"fmt"
 )
 
+// IdemixIIssuerPublicKeyImporterErrorType ...
 type IdemixIIssuerPublicKeyImporterErrorType int
 
 const (
+	// IdemixIssuerPublicKeyImporterUnmarshallingError ...
 	IdemixIssuerPublicKeyImporterUnmarshallingError IdemixIIssuerPublicKeyImporterErrorType = iota
+	// IdemixIssuerPublicKeyImporterHashError ...
 	IdemixIssuerPublicKeyImporterHashError
+	// IdemixIssuerPublicKeyImporterValidationError ...
 	IdemixIssuerPublicKeyImporterValidationError
+	// IdemixIssuerPublicKeyImporterNumAttributesError ...
 	IdemixIssuerPublicKeyImporterNumAttributesError
+	// IdemixIssuerPublicKeyImporterAttributeNameError ...
 	IdemixIssuerPublicKeyImporterAttributeNameError
 )
 
+// IdemixIssuerPublicKeyImporterError ...
 type IdemixIssuerPublicKeyImporterError struct {
 	Type     IdemixIIssuerPublicKeyImporterErrorType
 	ErrorMsg string

@@ -17,8 +17,9 @@ const pkcs11Enabled = false
 
 // FactoryOpts holds configuration information used to initialize factory implementations
 type FactoryOpts struct {
-	Default string  `json:"default" yaml:"Default"`
-	SW      *SwOpts `json:"SW,omitempty" yaml:"SW,omitempty"`
+	Default    string       `json:"default" yaml:"Default"`
+	SW         *SwOpts      `json:"SW,omitempty" yaml:"SW,omitempty"`
+	ServerOpts *server.Opts `json:"Server,omitempty" yaml:"server"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -57,6 +58,15 @@ func initFactories(config *FactoryOpts) error {
 		}
 	}
 
+	if config.Default == "SERVER" && config.ServerOpts != nil {
+		f := &ServerFactory{}
+		var err error
+		defaultBCCSP, err = initBCCSP(f, config)
+		if err != nil {
+			return errors.Wrapf(err, "Failed initializing PKCS11.BCCSP")
+		}
+	}
+
 	if defaultBCCSP == nil {
 		return errors.Errorf("Could not find default `%s` BCCSP", config.Default)
 	}
@@ -70,6 +80,8 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	switch config.Default {
 	case "SW":
 		f = &SWFactory{}
+	case ServerBasedFactoryName:
+		f = &ServerFactory{}
 	default:
 		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", config.Default)
 	}

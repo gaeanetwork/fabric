@@ -149,6 +149,7 @@ type IdemixCredentialRequestSignerOpts struct {
 	H crypto.Hash
 }
 
+// HashFunc ...
 func (o *IdemixCredentialRequestSignerOpts) HashFunc() crypto.Hash {
 	return o.H
 }
@@ -165,12 +166,13 @@ type IdemixAttributeType int
 const (
 	// IdemixHiddenAttribute represents an hidden attribute
 	IdemixHiddenAttribute IdemixAttributeType = iota
-	// IdemixStringAttribute represents a sequence of bytes
+	// IdemixBytesAttribute IdemixStringAttribute represents a sequence of bytes
 	IdemixBytesAttribute
 	// IdemixIntAttribute represents an int
 	IdemixIntAttribute
 )
 
+// IdemixAttribute ...
 type IdemixAttribute struct {
 	// Type is the attribute's type
 	Type IdemixAttributeType
@@ -195,6 +197,7 @@ func (o *IdemixCredentialSignerOpts) HashFunc() crypto.Hash {
 	return o.H
 }
 
+// IssuerPublicKey ...
 func (o *IdemixCredentialSignerOpts) IssuerPublicKey() Key {
 	return o.IssuerPK
 }
@@ -227,6 +230,7 @@ type IdemixSignerOpts struct {
 	H crypto.Hash
 }
 
+// HashFunc ...
 func (o *IdemixSignerOpts) HashFunc() crypto.Hash {
 	return o.H
 }
@@ -292,6 +296,7 @@ type IdemixCRISignerOpts struct {
 	H crypto.Hash
 }
 
+// HashFunc ...
 func (o *IdemixCRISignerOpts) HashFunc() crypto.Hash {
 	return o.H
 }
